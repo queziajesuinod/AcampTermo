@@ -321,7 +321,7 @@ app.post('/api/gerar-pdf', async (req, res) => {
     
     // 🔧 CONTEÚDO DO TERMO CORRIGIDO
     const paragrafos = [
-      `Eu, {NOME_RESPONSAVEL}, responsável pelo(a) menor {NOME_FILHO}, autorizo sua participação no ACAMP RELEVANTE JUNIORS 2025, que será realizado nos dias 24 a 26 de julho de 2025 no Centro de Treinamento Oração e Comunhão - CTOC, Campo Grande/MS.`,
+      `Eu, {NOME_RESPONSAVEL}, responsável pelo(a) {NOME_FILHO}, autorizo sua participação no ACAMP RELEVANTE JUNIORS 2025, que será realizado nos dias 24 a 26 de julho de 2025 no Centro de Treinamento Oração e Comunhão - CTOC, Campo Grande/MS.`,
       
       `Autorizo os responsáveis pelo ACAMP RELEVANTE JUNIORS 2025, em caso de acidente ou problemas de saúde, a conduzir meu/minha filho(a) para os primeiros socorros em qualquer Pronto Socorro de Campo Grande/MS, se necessário.`,
       
