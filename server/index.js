@@ -464,8 +464,29 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
       data: dayjs().format('DD/MM/YYYY')
     };
     
-    // 🔧 POSIÇÃO CORRETA DA ASSINATURA (NO FINAL DO DOCUMENTO)
-    const yAssinatura = 45; // Posição fixa no final da página
+     // 🔧 CALCULAR POSIÇÃO DINÂMICA DA ASSINATURA
+    // Buscar posição aproximada do último texto na página
+    const margin = 50;
+    const fontSize = 11;
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    // 🔧 POSIÇÃO MAIS PRÓXIMA DO ÚLTIMO TEXTO
+    // Estimar posição baseada no conteúdo típico do documento
+    let yAssinatura;
+    
+    if (pages.length === 1) {
+      // Se é uma página só, assinatura mais embaixo
+      yAssinatura = height - 650; // Aproximadamente onde termina o texto na página 1
+    } else {
+      // Se são duas páginas, assinatura logo após o último parágrafo da página 2
+      yAssinatura = height - 200; // 🔧 POSIÇÃO MAIS ALTA - Logo após o último texto
+    }
+    
+    console.log(`📍 Posição da assinatura calculada: ${yAssinatura} (altura da página: ${height})`);
+    
+    // 🔧 ESPAÇO ANTES DA ASSINATURA (MENOR)
+    yAssinatura -= 50; // Espaço reduzido entre último texto e assinatura
     
     // Adicionar assinatura digital
     lastPage.drawImage(pngImage, {
@@ -476,9 +497,6 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     });
     
     // Adicionar texto da assinatura
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    
     lastPage.drawText(`Assinatura do responsável: ${dados.nomeResponsavel}`, {
       x: 50,
       y: yAssinatura - 20,
@@ -486,20 +504,17 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
       font: fontBold,
       color: rgb(0, 0, 0),
     });
-
     const dataLocal = `Campo Grande/MS, ${dados.data}`;
  
-
     lastPage.drawText(dataLocal, {
       x: 50,
-      y: yAssinatura-40,
+      y: yAssinatura - 40,
       size: 11,
-      font: fontBold,
+      font: font,
       color: rgb(0, 0, 0),
     });
-    
-    
-    
+    console.log(`✍️ Assinatura adicionada na posição Y: ${yAssinatura}`);
+
     // Salvar PDF atualizado
     const pdfBytesAtualizados = await pdfDoc.save();
     await fs.writeFile(caminhoFisico, pdfBytesAtualizados);
