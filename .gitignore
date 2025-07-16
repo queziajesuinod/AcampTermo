@@ -2,8 +2,10 @@
 node_modules/
 */node_modules/
 .DS_Store
-.Dockerfile
+Dockerfile
 docker-compose.yml
 .env
 server/public/assinados/*.pdf
 
+
+ß

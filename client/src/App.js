@@ -83,7 +83,7 @@ function App() {
     setEtapa('busca');
 
     try {
-      const response = await fetch(`http://localhost:3001/api/inscrito/${cpfLimpo}`);
+      const response = await fetch(`https://termoacamp.aleftec.com.br/api/inscrito/${cpfLimpo}`);
       const data = await response.json();
 
       if (response.ok) {
@@ -135,7 +135,7 @@ function App() {
     setSuccess('');
 
     try {
-      const response = await fetch('http://localhost:3001/api/gerar-termo', {
+      const response = await fetch('https://termoacamp.aleftec.com.br/api/gerar-termo', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,7 +184,7 @@ function App() {
     try {
       const assinaturaDataURL = sigCanvas.current.toDataURL();
       
-      const response = await fetch('http://localhost:3001/api/atualizar-assinatura', {
+      const response = await fetch('https://termoacamp.aleftec.com.br/api/atualizar-assinatura', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -234,7 +234,7 @@ function App() {
   const baixarPDF = () => {
     if (inscrito && inscrito.pdf_url) {
       const link = document.createElement('a');
-      link.href = `http://localhost:3001${inscrito.pdf_url}`;
+      link.href = `https://termoacamp.aleftec.com.br${inscrito.pdf_url}`;
       link.download = `termo_${inscrito.documento}.pdf`;
       document.body.appendChild(link);
       link.click();
@@ -310,7 +310,7 @@ function App() {
               <h3>📄 Termo de Responsabilidade</h3>
               <div className="pdf-buttons">
                 <a 
-                  href={`http://localhost:3001${inscrito.pdf_url || inscrito.pdf_path}`}
+                  href={`https://termoacamp.aleftec.com.br${inscrito.pdf_url || inscrito.pdf_path}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="pdf-view-button"
@@ -467,7 +467,7 @@ function App() {
             {inscrito.pdf_url && (
               <div className="pdf-section">
                 <a 
-                  href={`http://localhost:3001${inscrito.pdf_url}`}
+                  href={`https://termoacamp.aleftec.com.br${inscrito.pdf_url}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="pdf-link"
