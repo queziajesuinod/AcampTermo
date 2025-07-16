@@ -123,7 +123,7 @@ function App() {
     try {
       console.log(`🔍 Buscando inscrito com CPF: ${cpfLimpo}`);
       
-      const response = await fetch(`http://localhost:3001/api/inscrito/${cpfLimpo}`);
+      const response = await fetch(`https://termoacamp.aleftec.com.br/api/inscrito/${cpfLimpo}`);
       const data = await response.json();
 
       console.log('📋 Resposta do servidor:', data);
@@ -195,7 +195,7 @@ function App() {
         dados_editados: modoEdicao ? dadosEditados : null
       });
 
-      const response = await fetch('http://localhost:3001/api/gerar-pdf', {
+      const response = await fetch('https://termoacamp.aleftec.com.br/api/gerar-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -254,7 +254,7 @@ function App() {
       
       console.log('✍️ Adicionando assinatura para CPF:', inscrito.documento);
       
-      const response = await fetch('http://localhost:3001/api/atualizar-assinatura', {
+      const response = await fetch('https://termoacamp.aleftec.com.br/api/atualizar-assinatura', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -312,7 +312,7 @@ function App() {
     if (inscrito && (inscrito.pdf_url || inscrito.pdf_path)) {
       const pdfUrl = inscrito.pdf_url || inscrito.pdf_path;
       const link = document.createElement('a');
-      link.href = `http://localhost:3001${pdfUrl}`;
+      link.href = `https://termoacamp.aleftec.com.br${pdfUrl}`;
       link.download = `termo_${inscrito.documento}.pdf`;
       link.target = '_blank';
       document.body.appendChild(link);
@@ -327,7 +327,7 @@ function App() {
   const visualizarPDF = () => {
     if (inscrito && (inscrito.pdf_url || inscrito.pdf_path)) {
       const pdfUrl = inscrito.pdf_url || inscrito.pdf_path;
-      window.open(`http://localhost:3001${pdfUrl}`, '_blank');
+      window.open(`https://termoacamp.aleftec.com.br${pdfUrl}`, '_blank');
     } else {
       setError('PDF não encontrado');
     }
