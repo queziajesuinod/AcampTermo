@@ -1,4 +1,4 @@
-// App.jsx FINAL AJUSTADO - Validação CPF + Fluxo para termos já assinados
+// App.jsx DADOS CORRIGIDO - Preenchimento correto dos dados do inscrito
 import React, { useState, useRef, useEffect } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import Validados from './Validados';
@@ -104,7 +104,7 @@ function App() {
     setCpf(cpfFormatado);
   };
 
-  // Função para buscar inscrito
+  // 🔧 Função corrigida para buscar inscrito
   const buscarInscrito = async () => {
     const cpfLimpo = cpf.replace(/\D/g, '');
     
@@ -121,46 +121,61 @@ function App() {
     setEtapa('busca');
 
     try {
-      const response = await fetch(`https://termoacamp.aleftec.com.br/api/inscrito/${cpfLimpo}`);
+      console.log(`🔍 Buscando inscrito com CPF: ${cpfLimpo}`);
+      
+      const response = await fetch(`http://localhost:3001/api/inscrito/${cpfLimpo}`);
       const data = await response.json();
 
-      if (response.ok) {
-        setInscrito(data);
+      console.log('📋 Resposta do servidor:', data);
+
+      if (data.success) {
+        // 🔧 CORREÇÃO: Usar data.data em vez de data diretamente
+        const inscritoData = data.data;
+        console.log('👤 Dados do inscrito recebidos:', inscritoData);
         
-        // 🆕 VERIFICAR SE JÁ FOI ASSINADO
-        if (data.assinatura_realizada && data.pdf_path) {
+        setInscrito(inscritoData);
+        
+        // 🔧 VERIFICAR SE JÁ FOI ASSINADO
+        if (data.ja_assinado || (inscritoData.assinatura_realizada && inscritoData.pdf_path)) {
           console.log('📋 Termo já assinado, indo para tela de visualização');
           setEtapa('ja_assinado');
           setSuccess('Termo já foi assinado anteriormente!');
         } else {
-          // Fluxo normal para termos não assinados
-          setDadosEditados({
-            nome_completo: data.nome_completo,
-            responsavel: data.responsavel,
-            tel_responsavel: data.tel_responsavel
+          // 🔧 PREENCHER DADOS EDITADOS COM OS DADOS RECEBIDOS
+          console.log('📝 Preenchendo dados para edição:', {
+            nome_completo: inscritoData.nome_completo,
+            responsavel: inscritoData.responsavel,
+            tel_responsavel: inscritoData.tel_responsavel
           });
           
-          // Pré-preencher contato de emergência se já existir
+          setDadosEditados({
+            nome_completo: inscritoData.nome_completo || '',
+            responsavel: inscritoData.responsavel || '',
+            tel_responsavel: inscritoData.tel_responsavel || ''
+          });
+          
+          // 🔧 PRÉ-PREENCHER CONTATO DE EMERGÊNCIA SE JÁ EXISTIR
           setContatoEmergencia({
-            nome: data.contato_nome || '',
-            telefone: data.contato_telefone || ''
+            nome: inscritoData.contato_nome || '',
+            telefone: inscritoData.contato_telefone || ''
           });
           
           setEtapa('contato_emergencia');
           setSuccess('Inscrito encontrado! Preencha o contato de emergência.');
         }
       } else {
-        setError(data.error || 'Erro ao buscar inscrito');
+        console.error('❌ Erro na resposta:', data);
+        setError(data.message || 'Inscrito não encontrado');
       }
     } catch (err) {
+      console.error('❌ Erro de conexão:', err);
       setError('Erro de conexão com o servidor');
-      console.error('Erro:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Função para gerar termo com contato de emergência
+  // 🔧 Função corrigida para gerar termo
   const gerarTermo = async () => {
     // Validar contato de emergência
     if (!contatoEmergencia.nome.trim() || !contatoEmergencia.telefone.trim()) {
@@ -173,7 +188,14 @@ function App() {
     setSuccess('');
 
     try {
-      const response = await fetch('https://termoacamp.aleftec.com.br/api/gerar-termo', {
+      console.log('📄 Gerando termo com dados:', {
+        cpf: inscrito.documento,
+        contato_nome: contatoEmergencia.nome,
+        contato_telefone: contatoEmergencia.telefone,
+        dados_editados: modoEdicao ? dadosEditados : null
+      });
+
+      const response = await fetch('http://localhost:3001/api/gerar-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -187,24 +209,32 @@ function App() {
       });
 
       const data = await response.json();
+      console.log('📋 Resposta da geração de PDF:', data);
 
-      if (response.ok) {
-        setInscrito(data);
+      if (data.success) {
+        // 🔧 ATUALIZAR INSCRITO COM DADOS RETORNADOS
+        setInscrito(prev => ({
+          ...prev,
+          pdf_path: data.pdf_url,
+          pdf_url: data.pdf_url,
+          assinatura_realizada: false
+        }));
+        
         setEtapa('termo_gerado');
         setModoEdicao(false);
         setSuccess('Termo gerado com sucesso!');
       } else {
-        setError(data.error || 'Erro ao gerar termo');
+        setError(data.message || 'Erro ao gerar termo');
       }
     } catch (err) {
+      console.error('❌ Erro ao gerar termo:', err);
       setError('Erro de conexão com o servidor');
-      console.error('Erro:', err);
     } finally {
       setGerandoTermo(false);
     }
   };
 
-  // Função para adicionar assinatura
+  // 🔧 Função corrigida para adicionar assinatura
   const adicionarAssinatura = async () => {
     if (!inscrito) {
       setError('Nenhum inscrito selecionado');
@@ -222,7 +252,9 @@ function App() {
     try {
       const assinaturaDataURL = sigCanvas.current.toDataURL();
       
-      const response = await fetch('https://termoacamp.aleftec.com.br/api/atualizar-assinatura', {
+      console.log('✍️ Adicionando assinatura para CPF:', inscrito.documento);
+      
+      const response = await fetch('http://localhost:3001/api/atualizar-assinatura', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -234,17 +266,23 @@ function App() {
       });
 
       const data = await response.json();
+      console.log('📋 Resposta da assinatura:', data);
 
-      if (response.ok) {
+      if (data.success) {
         setSuccess('Assinatura adicionada com sucesso!');
-        setInscrito(prev => ({ ...prev, assinatura_realizada: true }));
+        setInscrito(prev => ({ 
+          ...prev, 
+          assinatura_realizada: true,
+          pdf_url: data.pdf_url || prev.pdf_url
+        }));
         sigCanvas.current.clear();
+        setEtapa('ja_assinado'); // Ir para tela de termo assinado
       } else {
-        setError(data.error || 'Erro ao adicionar assinatura');
+        setError(data.message || 'Erro ao adicionar assinatura');
       }
     } catch (err) {
+      console.error('❌ Erro ao adicionar assinatura:', err);
       setError('Erro de conexão com o servidor');
-      console.error('Erro:', err);
     } finally {
       setLoading(false);
     }
@@ -263,20 +301,35 @@ function App() {
     setInscrito(null);
     setCpf('');
     setContatoEmergencia({ nome: '', telefone: '' });
+    setDadosEditados({ nome_completo: '', responsavel: '', tel_responsavel: '' });
     setModoEdicao(false);
     setError('');
     setSuccess('');
   };
 
-  // Função para baixar PDF
+  // 🔧 Função corrigida para baixar PDF
   const baixarPDF = () => {
-    if (inscrito && inscrito.pdf_url) {
+    if (inscrito && (inscrito.pdf_url || inscrito.pdf_path)) {
+      const pdfUrl = inscrito.pdf_url || inscrito.pdf_path;
       const link = document.createElement('a');
-      link.href = `https://termoacamp.aleftec.com.br${inscrito.pdf_url}`;
+      link.href = `http://localhost:3001${pdfUrl}`;
       link.download = `termo_${inscrito.documento}.pdf`;
+      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    } else {
+      setError('PDF não encontrado');
+    }
+  };
+
+  // 🔧 Função corrigida para visualizar PDF
+  const visualizarPDF = () => {
+    if (inscrito && (inscrito.pdf_url || inscrito.pdf_path)) {
+      const pdfUrl = inscrito.pdf_url || inscrito.pdf_path;
+      window.open(`http://localhost:3001${pdfUrl}`, '_blank');
+    } else {
+      setError('PDF não encontrado');
     }
   };
 
@@ -291,11 +344,13 @@ function App() {
         <header className="header">
           <h1>Sistema de Termo de Responsabilidade</h1>
           <p>ACAMP RELEVANTE JUNIORS 2025</p>
+          
         </header>
 
         {/* Etapa 1: Busca de CPF com validação */}
         {etapa === 'busca' && (
           <div className="search-section">
+            <h2>🔍 Buscar Inscrito</h2>
             <div className="input-group">
               <input
                 type="text"
@@ -335,16 +390,22 @@ function App() {
               <h3>📋 Dados do Inscrito</h3>
               <div className="data-grid">
                 <div className="data-item">
-                  <strong>Nome:</strong> {inscrito.nome_completo}
+                  <strong>Nome:</strong> {inscrito.nome_completo || 'N/A'}
                 </div>
                 <div className="data-item">
-                  <strong>CPF:</strong> {inscrito.documento}
+                  <strong>CPF:</strong> {inscrito.documento || 'N/A'}
                 </div>
                 <div className="data-item">
-                  <strong>Responsável:</strong> {inscrito.responsavel}
+                  <strong>Responsável:</strong> {inscrito.responsavel || 'N/A'}
                 </div>
                 <div className="data-item">
-                  <strong>Telefone do Responsável:</strong> {inscrito.tel_responsavel}
+                  <strong>Telefone do Responsável:</strong> {inscrito.tel_responsavel || 'N/A'}
+                </div>
+                <div className="data-item">
+                  <strong>Campus:</strong> {inscrito.campus || 'N/A'}
+                </div>
+                <div className="data-item">
+                  <strong>Email:</strong> {inscrito.email || 'N/A'}
                 </div>
               </div>
             </div>
@@ -352,14 +413,12 @@ function App() {
             <div className="pdf-actions">
               <h3>📄 Termo de Responsabilidade</h3>
               <div className="pdf-buttons">
-                <a 
-                  href={`https://termoacamp.aleftec.com.br${inscrito.pdf_url || inscrito.pdf_path}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button 
+                  onClick={visualizarPDF}
                   className="pdf-view-button"
                 >
                   👁️ Visualizar Termo
-                </a>
+                </button>
                 <button 
                   onClick={baixarPDF}
                   className="pdf-download-button"
@@ -435,6 +494,7 @@ function App() {
                       value={dadosEditados.nome_completo}
                       onChange={(e) => setDadosEditados(prev => ({ ...prev, nome_completo: e.target.value }))}
                       className="form-input"
+                      placeholder={inscrito.nome_completo}
                     />
                   </div>
 
@@ -445,6 +505,7 @@ function App() {
                       value={dadosEditados.responsavel}
                       onChange={(e) => setDadosEditados(prev => ({ ...prev, responsavel: e.target.value }))}
                       className="form-input"
+                      placeholder={inscrito.responsavel}
                     />
                   </div>
 
@@ -455,27 +516,37 @@ function App() {
                       value={dadosEditados.tel_responsavel}
                       onChange={(e) => setDadosEditados(prev => ({ ...prev, tel_responsavel: e.target.value }))}
                       className="form-input"
+                      placeholder={inscrito.tel_responsavel}
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Dados atuais para referência */}
+            {/* 🔧 DADOS ATUAIS CORRIGIDOS - Mostrar dados do inscrito */}
             <div className="current-data">
               <h3>📋 Dados Atuais</h3>
               <div className="data-grid">
                 <div className="data-item">
-                  <strong>Nome do Inscrito:</strong> {modoEdicao ? dadosEditados.nome_completo : inscrito.nome_completo}
+                  <strong>Nome do Inscrito:</strong> {modoEdicao ? (dadosEditados.nome_completo || inscrito.nome_completo) : inscrito.nome_completo}
                 </div>
                 <div className="data-item">
                   <strong>CPF:</strong> {inscrito.documento}
                 </div>
                 <div className="data-item">
-                  <strong>Responsável:</strong> {modoEdicao ? dadosEditados.responsavel : inscrito.responsavel}
+                  <strong>Responsável:</strong> {modoEdicao ? (dadosEditados.responsavel || inscrito.responsavel) : inscrito.responsavel}
                 </div>
                 <div className="data-item">
-                  <strong>Telefone do Responsável:</strong> {modoEdicao ? dadosEditados.tel_responsavel : inscrito.tel_responsavel}
+                  <strong>Telefone do Responsável:</strong> {modoEdicao ? (dadosEditados.tel_responsavel || inscrito.tel_responsavel) : inscrito.tel_responsavel}
+                </div>
+                <div className="data-item">
+                  <strong>Campus:</strong> {inscrito.campus}
+                </div>
+                <div className="data-item">
+                  <strong>Email:</strong> {inscrito.email}
+                </div>
+                <div className="data-item">
+                  <strong>Idade:</strong> {inscrito.idade}
                 </div>
               </div>
             </div>
@@ -507,16 +578,14 @@ function App() {
             </div>
 
             {/* Link para visualizar PDF */}
-            {inscrito.pdf_url && (
+            {(inscrito.pdf_url || inscrito.pdf_path) && (
               <div className="pdf-section">
-                <a 
-                  href={`https://termoacamp.aleftec.com.br${inscrito.pdf_url}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button 
+                  onClick={visualizarPDF}
                   className="pdf-link"
                 >
                   📄 Visualizar Termo de Responsabilidade
-                </a>
+                </button>
               </div>
             )}
 
@@ -566,7 +635,7 @@ function App() {
                 onClick={voltarBusca}
                 className="new-search-button"
               >
-                🔍 Nova Busca Termo
+                🔍 Nova Busca
               </button>
             </div>
           </div>
