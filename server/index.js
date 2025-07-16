@@ -491,10 +491,10 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
  
 
     lastPage.drawText(dataLocal, {
-      x: margin,
+      x: 50,
       y: yAssinatura-40,
-      size: fontSize,
-      font: font,
+      size: 11,
+      font: fontBold,
       color: rgb(0, 0, 0),
     });
     
