@@ -6,6 +6,4 @@ Dockerfile
 docker-compose.yml
 .env
 server/public/assinados/*.pdf
-
-
-ß
+/client/build

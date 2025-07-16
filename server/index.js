@@ -13,7 +13,7 @@ const port = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '30mb' }));
 app.use('/assinados', express.static(path.join(__dirname, 'public', 'assinados')));
 
 // Configuração do banco PostgreSQL
@@ -469,6 +469,16 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     res.status(500).json({ error: 'Erro ao adicionar assinatura' });
   }
 });
+
+// Servir o frontend build (React)
+const clientBuildPath = path.join(__dirname, '../client/build');
+
+app.use(express.static(clientBuildPath));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
+});
+
 
 // Iniciar servidor
 app.listen(port, '0.0.0.0', () => {
