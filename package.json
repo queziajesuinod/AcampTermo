@@ -1,0 +1,53 @@
+{
+  "name": "acamp-termo-sistema-completo",
+  "version": "2.0.0",
+  "description": "Sistema Completo de Termo de Responsabilidade - ACAMP RELEVANTE JUNIORS 2025",
+  "main": "server/index.js",
+  "scripts": {
+    "prestart": "npm run fix-ports",
+    "start": "npm run start:server",
+    "start:server": "cd server && npm start",
+    "start:client": "cd client && cross-env BROWSER=none PORT=3000 npm start",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && cross-env BROWSER=none PORT=3000 npm start",
+    "dev": "npm run fix-ports && concurrently --kill-others-on-fail \"npm run dev:server\" \"npm run dev:client\"",
+    "fix-ports": "node fix-ports.js",
+    "install:server": "cd server && npm install",
+    "install:client": "cd client && npm install",
+    "install:all": "npm install && npm run install:server && npm run install:client",
+    "build:client": "cd client && npm run build",
+    "setup": "npm run install:all && npm run fix-ports && echo \"✅ Setup completo! Use npm run dev para rodar o sistema.\"",
+    "clean": "npm run fix-ports && echo \"🧹 Portas limpas!\"",
+    "test:connection": "node -e \"const http = require('http'); const req = http.get('http://localhost:3001/api/status', (res) => { console.log('✅ Servidor OK'); process.exit(0); }); req.on('error', () => { console.log('❌ Servidor não responde'); process.exit(1); }); req.setTimeout(5000, () => { console.log('❌ Timeout'); process.exit(1); });\"",
+    "test:system": "npm run test:connection",
+    "logs:server": "cd server && npm run dev",
+    "logs:client": "cd client && npm start",
+    "reset": "npm run fix-ports && node -e \"const fs = require('fs'); const path = require('path'); ['node_modules', 'server/node_modules', 'client/node_modules'].forEach(dir => { try { fs.rmSync(dir, {recursive: true, force: true}); console.log('🗑️ Removido:', dir); } catch(e) {} });\" && npm run install:all",
+    "help": "node -e \"console.log('📋 Comandos disponíveis:'); console.log('  npm run dev          - Rodar sistema completo'); console.log('  npm run setup        - Configuração inicial'); console.log('  npm run fix-ports    - Limpar portas ocupadas'); console.log('  npm run test:system  - Testar se tudo funciona'); console.log('  npm run reset        - Reset completo');\""
+  },
+  "keywords": [
+    "pdf",
+    "assinatura",
+    "termo",
+    "responsabilidade",
+    "react",
+    "express",
+    "acamp",
+    "juniors"
+  ],
+  "author": "IECG - Igreja Evangélica Comunidade Global",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "local"
+  }
+}
+

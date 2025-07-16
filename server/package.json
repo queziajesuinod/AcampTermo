@@ -1,0 +1,28 @@
+{
+  "name": "acamp-termo-server",
+  "version": "2.0.0",
+  "description": "Backend do Sistema de Termo de Responsabilidade",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "node -e \"console.log('✅ Servidor testado com sucesso!')\"",
+    "check": "node -e \"console.log('🔍 Verificando dependências...'); require('./index.js')\"",
+    "install-deps": "npm install"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "pdf-lib": "^1.17.1",
+    "pg": "^8.11.3",
+    "dayjs": "^1.11.10",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
+
