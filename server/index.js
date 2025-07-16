@@ -490,7 +490,7 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     const dataLocal = `Campo Grande/MS, ${dados.data}`;
  
 
-      paginaAtual.drawText(dataLocal, {
+    lastPage.drawText(dataLocal, {
       x: margin,
       y: yAssinatura-40,
       size: fontSize,
