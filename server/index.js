@@ -191,7 +191,7 @@ app.put('/api/inscrito/:cpf', async (req, res) => {
     
     const updateQuery = `
       UPDATE inscritos 
-      SET nome_completo = $1, responsavel = $2, tel_responsavel = $3, contato_nome = $4, contato_telefone = $5, updated_at = NOW()
+      SET nome_completo = $1, responsavel = $2, tel_responsavel = $3, contato_nome = $4, contato_telefone = $5
       WHERE documento = $6
       RETURNING *
     `;
@@ -510,7 +510,7 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     
     // Atualizar status no banco
     await pool.query(
-      'UPDATE inscritos SET assinatura_realizada = true, updated_at = NOW() WHERE documento = $1',
+      'UPDATE inscritos SET assinatura_realizada = true WHERE documento = $1',
       [cpf]
     );
     
@@ -581,7 +581,7 @@ app.get('/api/validados', async (req, res) => {
     
     
     // Ordenação
-    query += ` ORDER BY updated_at DESC`;
+    query += ` ORDER BY id DESC`;
     
     // Paginação
     const offset = (page - 1) * limit;
@@ -710,6 +710,20 @@ app.get('/api/validados/stats', async (req, res) => {
   }
 });
 
+
+
+
+
+// Servir o frontend build (React)
+const clientBuildPath = path.join(__dirname, '../client/build');
+
+app.use(express.static(clientBuildPath));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
+});
+
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
@@ -726,4 +740,6 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`🔗 Health check: http://localhost:${port}/api/health`);
   console.log(`📋 Endpoint validados: http://localhost:${port}/api/validados`);
 });
+
+module.exports = app;
 
