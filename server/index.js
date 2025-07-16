@@ -282,23 +282,29 @@ app.post('/api/gerar-termo', async (req, res) => {
     
     // 🔧 CONTEÚDO DO TERMO SEM ÁREA DE ASSINATURA
     const conteudoTermo = [
-      `Eu, {NOME_RESPONSAVEL}, responsável pelo(a) menor {NOME_FILHO}, autorizo sua participação no ACAMP RELEVANTE JUNIORS 2025, que será realizado nos dias 24 a 26 de janeiro de 2025, no Sítio Bela Vista, localizado na Estrada Parque, s/n, Jardim Anache, Campo Grande/MS.`,
+      `Eu, {NOME_RESPONSAVEL}, responsável pelo(a) menor {NOME_FILHO}, autorizo sua participação no ACAMP RELEVANTE JUNIORS 2025, que será realizado nos dias24 a 26 de julho de 2025 no Centro de Treinamento Oração e Comunhão - CTOC , Campo Grande/MS.`, 
       
-      `Declaro estar ciente de que o evento envolve atividades recreativas, esportivas e educativas, e que meu(minha) filho(a) participará sob minha total responsabilidade.`,
+      `Autorizo os responsáveis pelo ACAMP RELEVANTE JUNIORS 2025, em caso de acidente ou problemas de saúde, a conduzir meu/minha filho(a) para os primeiros socorros em qualquer Pronto Socorro de Campo Grande/MS, se necessário.`,
       
-      `Autorizo a coordenação do evento a tomar as medidas necessárias em caso de emergência médica, incluindo o transporte para unidade de saúde e a realização de procedimentos médicos de urgência, caso não seja possível o contato imediato comigo.`,
+      `Autorizo o uso da imagem registrada em foto ou vídeo do acampante, sem finalidade comercial, para postagens nas redes sociais (Instagram, Facebook e site oficial da Igreja Evangélica Comunidade Global) do ACAMP RELEVANTE JUNIORS 2025, sendo que a autorização se limita às imagens registradas no contexto do acampamento e suas programações. `,
+
+      `Estou ciente de que, no caso de extravio de qualquer objeto de valor em posse do acampante (câmera fotográfica, celular, lanterna, relógio, etc.), não haverá reembolso, sendo de minha total responsabilidade. `,
       
-      `Declaro que meu(minha) filho(a) não possui restrições médicas que impeçam sua participação nas atividades programadas. Caso possua alguma condição especial, comprometo-me a informar previamente à coordenação.`,
+      `Estou ciente de que será de minha responsabilidade todo e qualquer dano material contra o patrimônio do CTOC (local de realização do ACAMP RELEVANTE JUNIORS 2025), desde que comprovada a responsabilidade do meu/minha filho(a) no ocorrido. `,
       
-      `Autorizo o uso da imagem de meu(minha) filho(a) em fotografias e vídeos realizados durante o evento, para fins de divulgação institucional da igreja, sem fins lucrativos.`,
+      `Estou ciente de que, com o objetivo de contribuir para o bom aproveitamento dos acampantes, NÃO é aconselhável a visita/presença ou comunicação telefônica por parte dos pais, responsáveis ou parentes durante a temporada.`,
       
-      `Comprometo-me a buscar meu(minha) filho(a) pontualmente no horário estabelecido para o término do evento. Em caso de atraso, assumo total responsabilidade.`,
-      
-      `Em caso de ausência, autorizo a coordenação do ACAMP RELEVANTE JUNIORS 2025 a entrar em contato com a seguinte pessoa: NOME: {CONTATO_NOME} TELEFONE: {CONTATO_TELEFONE}`,
-      
-      `Declaro que li e compreendi todos os termos acima, concordando integralmente com as condições estabelecidas. Isento a organização do evento de qualquer responsabilidade por danos pessoais ou materiais, desde que comprovada a responsabilidade do meu(minha) filho(a) no ocorrido.`
-    ];
+      `Em caso de emergência, a coordenação do ACAMP RELEVANTE JUNIORS 2025 entrará em contato com os responsáveis.`,
     
+      `Em caso de ausência, autorizo a coordenação do ACAMP RELEVANTE JUNIORS 2025 a entrar em contato com a seguinte pessoa: NOME: {CONTATO_NOME} TELEFONE: {CONTATO_TELEFONE}`,
+
+      `Estou ciente de que, em caso de mau comportamento ou desobediência às regras do ACAMP RELEVANTE JUNIORS 2025, o responsável deverá buscar o adolescente no evento, sem direito a devolução do valor da inscrição.`,
+
+      `Estou ciente de que, será proibido o uso de celular durante o acampamento, sendo o uso e zelo do aparelho de total responsabilidade dele(a), assim como as consequências de seu uso indevido.`,
+
+      `Declaro que li e compreendi todos os termos acima, concordando integralmente com as condições estabelecidas. Isento a organização do evento de qualquer responsabilidade por danos pessoais ou materiais, desde que comprovada a responsabilidade do meu(minha) filho(a) no ocorrido.`
+  ];
+
     // Desenhar conteúdo
     conteudoTermo.forEach((paragrafo, index) => {
       const linhas = processarTextoComCampos(paragrafo, dados, font, fontSize, textWidth);
@@ -366,6 +372,187 @@ app.post('/api/gerar-termo', async (req, res) => {
   } catch (error) {
     console.error('❌ Erro ao gerar termo:', error);
     res.status(500).json({ error: 'Erro ao gerar termo' });
+  }
+});
+
+// 🆕 ENDPOINT: Listar termos validados (assinados) - CAMPOS CORRETOS
+app.get('/api/validados', async (req, res) => {
+  try {
+    console.log('🔍 Buscando termos validados...');
+    
+    const { busca, campus, page = 1, limit = 20 } = req.query;
+    
+    let query = `
+      SELECT 
+        id,
+        nome_completo,
+        documento,
+        email,
+        celular,
+        data_nascimento,
+        campus,
+        idade,
+        responsavel,
+        tel_responsavel,
+        lider_celula,
+        assinatura_realizada,
+        pdf_path,
+        contato_nome,
+        contato_telefone
+      FROM inscritos 
+      WHERE assinatura_realizada = true 
+      AND pdf_path IS NOT NULL 
+      AND pdf_path != ''
+    `;
+    
+    const params = [];
+    let paramCount = 0;
+    
+    // Filtro por busca (nome ou CPF)
+    if (busca && busca.trim() !== '') {
+      paramCount++;
+      query += ` AND (nome_completo ILIKE $${paramCount} OR documento ILIKE $${paramCount})`;
+      params.push(`%${busca.trim()}%`);
+    }
+    
+    // Filtro por campus
+    if (campus && campus.trim() !== '') {
+      paramCount++;
+      query += ` AND campus ILIKE $${paramCount}`;
+      params.push(`%${campus.trim()}%`);
+    }
+    
+    // Ordenação
+    query += ` ORDER BY id DESC`;
+    
+    // Paginação
+    const offset = (page - 1) * limit;
+    paramCount++;
+    query += ` LIMIT $${paramCount}`;
+    params.push(limit);
+    
+    paramCount++;
+    query += ` OFFSET $${paramCount}`;
+    params.push(offset);
+    
+    console.log('📋 Query executada:', query);
+    console.log('📋 Parâmetros:', params);
+    
+    const result = await pool.query(query, params);
+    
+    // Query para contar total de registros
+    let countQuery = `
+      SELECT COUNT(*) as total 
+      FROM inscritos 
+      WHERE assinatura_realizada = true 
+      AND pdf_path IS NOT NULL 
+      AND pdf_path != ''
+    `;
+    
+    const countParams = [];
+    let countParamCount = 0;
+    
+    // Aplicar os mesmos filtros na contagem
+    if (busca && busca.trim() !== '') {
+      countParamCount++;
+      countQuery += ` AND (nome_completo ILIKE $${countParamCount} OR documento ILIKE $${countParamCount})`;
+      countParams.push(`%${busca.trim()}%`);
+    }
+    
+    if (campus && campus.trim() !== '') {
+      countParamCount++;
+      countQuery += ` AND campus ILIKE $${countParamCount}`;
+      countParams.push(`%${campus.trim()}%`);
+    }
+    
+    const countResult = await pool.query(countQuery, countParams);
+    const total = parseInt(countResult.rows[0].total);
+    
+    // Processar resultados
+    const validados = result.rows.map(inscrito => ({
+      ...inscrito,
+      pdf_url: inscrito.pdf_path,
+      data_assinatura: inscrito.updated_at,
+      cpf_formatado: inscrito.documento.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
+      data_nascimento_formatada: inscrito.data_nascimento ? 
+        new Date(inscrito.data_nascimento).toLocaleDateString('pt-BR') : 'N/A'
+    }));
+    
+    console.log(`✅ Encontrados ${validados.length} termos validados de ${total} total`);
+    
+    res.json({
+      success: true,
+      data: validados,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: total,
+        totalPages: Math.ceil(total / limit)
+      },
+      filters: {
+        busca,
+        campus
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro ao buscar termos validados:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro interno do servidor ao buscar termos validados',
+      error: error.message
+    });
+  }
+});
+
+// 🆕 ENDPOINT: Estatísticas dos validados - CAMPOS CORRETOS
+app.get('/api/validados/stats', async (req, res) => {
+  try {
+    console.log('📊 Buscando estatísticas dos validados...');
+    
+    const statsQuery = `
+      SELECT 
+        COUNT(*) as total_assinados,
+        COUNT(DISTINCT campus) as total_campus,
+        campus,
+        COUNT(*) as total_por_campus
+      FROM inscritos 
+      WHERE assinatura_realizada = true 
+      AND pdf_path IS NOT NULL 
+      AND pdf_path != ''
+      GROUP BY ROLLUP(campus)
+      ORDER BY campus NULLS LAST
+    `;
+    
+    const result = await pool.query(statsQuery);
+    
+    // Separar estatísticas gerais e por campus
+    const estatisticasGerais = result.rows.find(row => row.campus === null);
+    const estatisticasPorCampus = result.rows.filter(row => row.campus !== null);
+    
+    console.log('✅ Estatísticas calculadas com sucesso');
+    
+    res.json({
+      success: true,
+      data: {
+        geral: {
+          total_assinados: parseInt(estatisticasGerais?.total_assinados || 0),
+          total_campus: parseInt(estatisticasGerais?.total_campus || 0)
+        },
+        por_campus: estatisticasPorCampus.map(stat => ({
+          campus: stat.campus,
+          total: parseInt(stat.total_por_campus)
+        }))
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Erro ao buscar estatísticas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro interno do servidor ao buscar estatísticas',
+      error: error.message
+    });
   }
 });
 

@@ -1,6 +1,7 @@
 // App.jsx FINAL AJUSTADO - Validação CPF + Fluxo para termos já assinados
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
+import Validados from './Validados';
 import './App.css';
 
 function App() {
@@ -27,8 +28,45 @@ function App() {
   // Estados de controle
   const [etapa, setEtapa] = useState('busca'); // 'busca', 'contato_emergencia', 'termo_gerado', 'ja_assinado'
   const [gerandoTermo, setGerandoTermo] = useState(false);
+
+  // 🆕 Estado para controle de rota
+  const [rotaAtual, setRotaAtual] = useState('home');
   
   const sigCanvas = useRef({});
+
+   // 🆕 Efeito para detectar rota na URL
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path === '/validados') {
+      setRotaAtual('validados');
+    } else {
+      setRotaAtual('home');
+    }
+    
+    // Listener para mudanças na URL
+    const handlePopState = () => {
+      const newPath = window.location.pathname;
+      if (newPath === '/validados') {
+        setRotaAtual('validados');
+      } else {
+        setRotaAtual('home');
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // 🆕 Função para navegar entre rotas
+  const navegarPara = (rota) => {
+    if (rota === 'validados') {
+      window.history.pushState({}, '', '/validados');
+      setRotaAtual('validados');
+    } else {
+      window.history.pushState({}, '', '/');
+      setRotaAtual('home');
+    }
+  };
 
   // Função para validar CPF
   const validarCPF = (cpf) => {
@@ -241,6 +279,11 @@ function App() {
       document.body.removeChild(link);
     }
   };
+
+  // 🆕 Renderizar baseado na rota
+  if (rotaAtual === 'validados') {
+    return <Validados />;
+  }
 
   return (
     <div className="App">
