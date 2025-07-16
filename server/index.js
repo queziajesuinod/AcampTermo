@@ -269,8 +269,7 @@ app.post('/api/gerar-pdf', async (req, res) => {
       NOME_FILHO: inscrito.nome_completo || 'NÃO INFORMADO',
       NOME_RESPONSAVEL: inscrito.responsavel || 'NÃO INFORMADO',
       CONTATO_NOME: contato_nome || 'NÃO INFORMADO',
-      CONTATO_TELEFONE: contato_telefone || 'NÃO INFORMADO',
-      DATA: dayjs().format('DD/MM/YYYY'),
+      CONTATO_TELEFONE: contato_telefone || 'NÃO INFORMADO'
     };
     
     console.log(`📝 Dados para o PDF:`, dados);
@@ -367,18 +366,7 @@ app.post('/api/gerar-pdf', async (req, res) => {
         paginaAtual = page2; // ✅ CORREÇÃO: Agora funciona porque é let
       }
     });
-    
-    // 🔧 DATA E LOCAL NO FINAL (SEM ÁREA DE ASSINATURA)
-    yPosition -= 30;
-    
-    const dataLocal = `Campo Grande/MS, ${dados.DATA}`;
-    paginaAtual.drawText(dataLocal, {
-      x: margin,
-      y: yPosition,
-      size: fontSize,
-      font: font,
-      color: rgb(0, 0, 0),
-    });
+
     
     console.log(`📝 PDF inicial criado SEM área de assinatura`);
     
@@ -477,7 +465,7 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     };
     
     // 🔧 POSIÇÃO CORRETA DA ASSINATURA (NO FINAL DO DOCUMENTO)
-    const yAssinatura = 150; // Posição fixa no final da página
+    const yAssinatura = 45; // Posição fixa no final da página
     
     // Adicionar assinatura digital
     lastPage.drawImage(pngImage, {
@@ -498,14 +486,19 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
       font: fontBold,
       color: rgb(0, 0, 0),
     });
-    
-    lastPage.drawText(`Data: ${dados.data}`, {
-      x: 50,
-      y: yAssinatura - 40,
-      size: 11,
-      font: fontBold,
+
+    const dataLocal = `Campo Grande/MS, ${dados.data}`;
+ 
+
+      paginaAtual.drawText(dataLocal, {
+      x: margin,
+      y: yAssinatura-40,
+      size: fontSize,
+      font: font,
       color: rgb(0, 0, 0),
     });
+    
+    
     
     // Salvar PDF atualizado
     const pdfBytesAtualizados = await pdfDoc.save();
