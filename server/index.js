@@ -344,13 +344,16 @@ app.post('/api/gerar-pdf', async (req, res) => {
       `Declaro que li e compreendi todos os termos acima, concordando integralmente com as condições estabelecidas. Isento a organização do evento de qualquer responsabilidade por danos pessoais ou materiais, desde que comprovada a responsabilidade do meu(minha) filho(a) no ocorrido.`
     ];
     
+    // 🔧 VARIÁVEL PARA PÁGINA ATUAL (LET EM VEZ DE CONST)
+    let paginaAtual = page1; // ✅ CORREÇÃO: let em vez de const
+    
     // 🔧 DESENHAR PARÁGRAFOS COM FORMATAÇÃO CORRETA
     paragrafos.forEach((paragrafo, index) => {
       // Processar campos dinâmicos
       const textoProcessado = processarCampos(paragrafo, dados);
       
       // Desenhar parágrafo justificado
-      yPosition = desenharTextoJustificado(page1, textoProcessado, margin, yPosition, fontSize, font, textWidth, 16);
+      yPosition = desenharTextoJustificado(paginaAtual, textoProcessado, margin, yPosition, fontSize, font, textWidth, 16);
       
       // Espaço entre parágrafos
       yPosition -= 10;
@@ -360,8 +363,8 @@ app.post('/api/gerar-pdf', async (req, res) => {
         const page2 = pdfDoc.addPage([pageWidth, pageHeight]);
         yPosition = pageHeight - margin - 30;
         
-        // Continuar na página 2
-        page1 = page2; // Redirecionar para a nova página
+        // 🔧 CORREÇÃO: Reatribuir variável let em vez de const
+        paginaAtual = page2; // ✅ CORREÇÃO: Agora funciona porque é let
       }
     });
     
@@ -369,7 +372,7 @@ app.post('/api/gerar-pdf', async (req, res) => {
     yPosition -= 30;
     
     const dataLocal = `Campo Grande/MS, ${dados.DATA}`;
-    page1.drawText(dataLocal, {
+    paginaAtual.drawText(dataLocal, {
       x: margin,
       y: yPosition,
       size: fontSize,
