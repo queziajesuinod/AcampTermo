@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import './Validados.css';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:3001';
+
 function Validados() {
   // Estados para validados
   const [validados, setValidados] = useState([]);
@@ -12,7 +14,6 @@ function Validados() {
   // Estados para filtros
   const [filtros, setFiltros] = useState({
     busca: '',
-    campus: '',
     data_inicio: '',
     data_fim: ''
   });
@@ -50,7 +51,7 @@ function Validados() {
       
       console.log('🔍 Buscando validados com parâmetros:', params.toString());
       
-      const response = await fetch(`http://localhost:3001/api/validados?${params}`);
+      const response = await fetch(`${API_BASE_URL}/api/validados?${params}`);
       const data = await response.json();
       
       if (data.success) {
@@ -74,7 +75,7 @@ function Validados() {
     try {
       setLoadingStats(true);
       
-      const response = await fetch('http://localhost:3001/api/validados/stats');
+      const response = await fetch(`${API_BASE_URL}/api/validados/stats`);
       const data = await response.json();
       
       if (data.success) {
@@ -112,7 +113,7 @@ function Validados() {
       // Garantir que a URL está correta
       let url = pdfUrl;
       if (!url.startsWith('http')) {
-        url = `https://termoacamp.aleftec.com.br${pdfUrl}`;
+        url = `${API_BASE_URL}${pdfUrl}`;
       }
       
       console.log('🔗 Abrindo PDF:', url);
@@ -130,7 +131,7 @@ function Validados() {
       // Garantir que a URL está correta
       let url = pdfUrl;
       if (!url.startsWith('http')) {
-        url = `https://termoacamp.aleftec.com.br${pdfUrl}`;
+        url = `${API_BASE_URL}${pdfUrl}`;
       }
       
       console.log('📥 Baixando PDF:', url);
@@ -178,16 +179,10 @@ function Validados() {
     });
   };
 
-  // Função para formatar CPF
-  const formatarCPF = (cpf) => {
-    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-  };
-
   // Função para limpar filtros
   const limparFiltros = () => {
     setFiltros({
       busca: '',
-      campus: '',
       data_inicio: '',
       data_fim: ''
     });
@@ -239,14 +234,6 @@ function Validados() {
                 <div className="stat-label">Total de Termos Assinados</div>
               </div>
             </div>
-            
-            <div className="stat-card secondary">
-              <div className="stat-icon">🏫</div>
-              <div className="stat-content">
-                <div className="stat-number">{estatisticas.geral.total_campus}</div>
-                <div className="stat-label">Campus Diferentes</div>
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -256,30 +243,17 @@ function Validados() {
         <h2>🔍 Filtros de Busca</h2>
         <div className="filtros-grid">
           <div className="filtro-group">
-            <label htmlFor="busca">🔍 Buscar por Nome ou CPF:</label>
+            <label htmlFor="busca">🔍 Buscar por Nome, Order Code ou Telefone:</label>
             <input
               id="busca"
               type="text"
               value={filtros.busca}
               onChange={(e) => setFiltros(prev => ({ ...prev, busca: e.target.value }))}
-              placeholder="Digite nome ou CPF..."
+              placeholder="Digite nome, order_code ou telefone..."
               className="filtro-input"
             />
           </div>
           
-          <div className="filtro-group">
-            <label htmlFor="campus">🏫 Campus:</label>
-            <input
-              id="campus"
-              type="text"
-              value={filtros.campus}
-              onChange={(e) => setFiltros(prev => ({ ...prev, campus: e.target.value }))}
-              placeholder="Digite o campus..."
-              className="filtro-input"
-            />
-          </div>
-          
-
         </div>
         
         <div className="filtros-actions">
@@ -326,11 +300,9 @@ function Validados() {
                   <thead>
                     <tr>
                       <th>Nome</th>
-                      <th>CPF</th>
+                      <th>Order Code</th>
                       <th>Responsável</th>
-                      <th>Campus</th>
                       <th>Telefone</th>
-                      <th>Email</th>
                       <th>Ações</th>
                     </tr>
                   </thead>
@@ -343,11 +315,9 @@ function Validados() {
                             <span className="status-badge">✅ Assinado</span>
                           </div>
                         </td>
-                        <td className="cpf-cell">{formatarCPF(validado.documento)}</td>
-                        <td>{validado.responsavel || 'N/A'}</td>
-                        <td>{validado.campus || 'N/A'}</td>
-                        <td>{validado.tel_responsavel || 'N/A'}</td>
-                        <td className="email-cell">{validado.email || 'N/A'}</td>
+                        <td className="ordercode-cell">{validado.order_code || 'N/A'}</td>
+                        <td>{validado.responsavel || validado.nome_responsavel || 'N/A'}</td>
+                        <td>{validado.telefone_responsavel || validado.tel_responsavel || 'N/A'}</td>
                         <td className="acoes-cell">
                           <div className="acoes-buttons">
                             <button 
@@ -358,7 +328,7 @@ function Validados() {
                               👁️
                             </button>
                             <button 
-                              onClick={() => baixarPDF(validado.pdf_url, `termo_${formatarCPF(validado.documento)}.pdf`)}
+                              onClick={() => baixarPDF(validado.pdf_url, `termo_${validado.order_code || validado.telefone_responsavel || 'termo'}.pdf`)}
                               className="btn-download"
                               title="Baixar PDF"
                             >

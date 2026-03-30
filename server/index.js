@@ -32,17 +32,16 @@ function quebrarTexto(texto, font, tamanho, larguraMaxima) {
   let linhaAtual = '';
 
   for (const palavra of palavras) {
-    const testeLinhaAtual = linhaAtual ? `${linhaAtual} ${palavra}` : palavra;
-    const larguraTesteLinhaAtual = font.widthOfTextAtSize(testeLinhaAtual, tamanho);
+    const teste = linhaAtual ? linhaAtual + ' ' + palavra : palavra;
+    const larguraTeste = font.widthOfTextAtSize(teste, tamanho);
 
-    if (larguraTesteLinhaAtual <= larguraMaxima) {
-      linhaAtual = testeLinhaAtual;
+    if (larguraTeste <= larguraMaxima) {
+      linhaAtual = teste;
     } else {
       if (linhaAtual) {
         linhas.push(linhaAtual);
         linhaAtual = palavra;
       } else {
-        // Palavra muito longa, quebrar forçadamente
         linhas.push(palavra);
       }
     }
@@ -55,124 +54,243 @@ function quebrarTexto(texto, font, tamanho, larguraMaxima) {
   return linhas;
 }
 
-// 🔧 Função melhorada para desenhar texto justificado
-function desenharTextoJustificado(page, texto, x, y, tamanho, font, larguraMaxima, espacoEntreLinhas = 16) {
+// Funcao para desenhar texto justificado
+function desenharTextoJustificado(
+  page,
+  texto,
+  x,
+  y,
+  tamanho,
+  font,
+  larguraMaxima,
+  espacoEntreLinhas = 16,
+  justificar = true
+) {
   const linhas = quebrarTexto(texto, font, tamanho, larguraMaxima);
   let yAtual = y;
 
   linhas.forEach((linha, index) => {
     const ehUltimaLinha = index === linhas.length - 1;
-    
-    if (ehUltimaLinha || linha.split(' ').length === 1) {
-      // Última linha ou linha com uma palavra: não justificar
+
+    if (!justificar || ehUltimaLinha || linha.split(' ').length === 1) {
       page.drawText(linha, {
-        x: x,
+        x,
         y: yAtual,
         size: tamanho,
-        font: font,
+        font,
         color: rgb(0, 0, 0),
       });
     } else {
-      // Justificar linha
       const palavras = linha.split(' ');
-      const larguraTextoSemEspacos = palavras.reduce((total, palavra) => {
+      const larguraSemEspacos = palavras.reduce((total, palavra) => {
         return total + font.widthOfTextAtSize(palavra, tamanho);
       }, 0);
-      
-      const espacoTotal = larguraMaxima - larguraTextoSemEspacos;
+
+      const espacoTotal = larguraMaxima - larguraSemEspacos;
       const espacoEntrePalavras = espacoTotal / (palavras.length - 1);
-      
+
       let xAtual = x;
       palavras.forEach((palavra, i) => {
         page.drawText(palavra, {
           x: xAtual,
           y: yAtual,
           size: tamanho,
-          font: font,
+          font,
           color: rgb(0, 0, 0),
         });
-        
+
         if (i < palavras.length - 1) {
           xAtual += font.widthOfTextAtSize(palavra, tamanho) + espacoEntrePalavras;
         }
       });
     }
-    
+
     yAtual -= espacoEntreLinhas;
   });
 
   return yAtual;
 }
 
-// 🔧 Função para processar texto com campos dinâmicos
+// Funcao para processar campos dinamicos
 function processarCampos(texto, dados) {
   let textoProcessado = texto;
-  
-  Object.keys(dados).forEach(campo => {
-    const regex = new RegExp(`{${campo}}`, 'g');
+
+  Object.keys(dados).forEach((campo) => {
+    const regex = new RegExp('{' + campo + '}', 'g');
     textoProcessado = textoProcessado.replace(regex, dados[campo]);
   });
-  
+
   return textoProcessado;
 }
 
-// Endpoint para buscar inscrito por CPF
-app.get('/api/inscrito/:cpf', async (req, res) => {
+function paragrafoDeveNegrito(paragrafo) {
+  const texto = String(paragrafo || '').trim();
+  if (!texto) return false;
+  if (/^\d+\.\s/.test(texto)) return true;
+
+  return (
+    texto === 'Estou ciente de que:' ||
+    texto === 'A organizacao compromete-se a:' ||
+    texto === 'Declaro que:'
+  );
+}
+
+function tipoListaPorCabecalho(texto) {
+  if (texto === 'Estou ciente de que:') return 'conduta';
+  if (texto === 'A organizacao compromete-se a:') return 'protecao';
+  if (texto === 'Estou ciente de que, em caso de:') return 'medidas';
+  if (texto === 'Declaro que:') return 'declaracao';
+  return null;
+}
+
+function ehItemDeLista(texto, tipoListaAtual) {
+  if (!tipoListaAtual) return false;
+
+  if (tipoListaAtual === 'conduta') {
+    return !/^\d+\.\s/.test(texto) && texto !== 'Estou ciente de que:';
+  }
+
+  if (tipoListaAtual === 'protecao') {
+    return (
+      !/^\d+\.\s/.test(texto) &&
+      texto !== 'A organizacao compromete-se a:' &&
+      !texto.startsWith('Da mesma forma')
+    );
+  }
+
+  if (tipoListaAtual === 'medidas' || tipoListaAtual === 'declaracao') {
+    return /;$/.test(texto);
+  }
+
+  return false;
+}
+
+function resolveInscritoSelector(payload) {
+  const { inscrito_id, order_code, telefone_responsavel } = payload;
+
+  if (inscrito_id !== undefined && inscrito_id !== null && String(inscrito_id).trim() !== '') {
+    const parsedId = Number(inscrito_id);
+    if (!Number.isInteger(parsedId) || parsedId <= 0) {
+      return { error: 'inscrito_id invalido' };
+    }
+    return { keyField: 'id', keyValue: parsedId };
+  }
+
+  if (order_code) {
+    return { keyField: 'order_code', keyValue: order_code };
+  }
+
+  if (telefone_responsavel) {
+    return { keyField: 'telefone_responsavel', keyValue: telefone_responsavel };
+  }
+
+  return null;
+}
+
+function nomeArquivoSeguro(baseName, inscritoId) {
+  const sanitizedBaseName = String(baseName || 'inscrito').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return sanitizedBaseName + '-' + String(inscritoId) + '.pdf';
+}
+
+async function carregarImagemBaseTermo(pdfDoc) {
+  const caminhoBaseTermo = path.join(__dirname, 'public', 'basetermo.jpg');
+
   try {
-    const { cpf } = req.params;
-    console.log(`🔍 Buscando inscrito com CPF: ${cpf}`);
-    
-    const result = await pool.query('SELECT * FROM inscritos WHERE documento = $1', [cpf]);
-    
-    if (result.rows.length === 0) {
-      console.log(`❌ Inscrito não encontrado para CPF: ${cpf}`);
-      return res.status(404).json({
+    const imagemBytes = await fs.readFile(caminhoBaseTermo);
+    return await pdfDoc.embedJpg(imagemBytes);
+  } catch (error) {
+    console.warn('Nao foi possivel carregar basetermo.jpg. PDF sera gerado sem fundo.', error.message);
+    return null;
+  }
+}
+
+function aplicarFundoPagina(page, imagemFundo) {
+  if (!imagemFundo) return;
+
+  const { width, height } = page.getSize();
+  page.drawImage(imagemFundo, {
+    x: 0,
+    y: 0,
+    width,
+    height,
+    opacity: 1,
+  });
+}
+
+// Endpoint para buscar inscrito por order_code ou telefone_responsavel
+app.get('/api/inscrito', async (req, res) => {
+  try {
+    const { order_code, telefone_responsavel } = req.query;
+
+    if (!order_code && !telefone_responsavel) {
+      return res.status(400).json({
         success: false,
-        message: 'Inscrito não encontrado'
+        message: 'Informe order_code ou telefone_responsavel na consulta'
       });
     }
-    
+
+    const searchCriteria = order_code ? 'order_code ' + order_code : 'telefone_responsavel ' + telefone_responsavel;
+    console.log('Buscando inscrito por ' + searchCriteria);
+
+    let query = 'SELECT * FROM inscritos WHERE';
+    const params = [];
+
+    if (order_code) {
+      params.push(order_code);
+      query += ' order_code = $' + params.length;
+    }
+
+    if (telefone_responsavel) {
+      if (params.length > 0) {
+        query += ' OR';
+      }
+      params.push(telefone_responsavel);
+      query += ' telefone_responsavel = $' + params.length;
+    }
+
+    const result = await pool.query(query, params);
+
+    if (result.rows.length === 0) {
+      console.log('Inscrito nao encontrado para ' + searchCriteria);
+      return res.status(404).json({
+        success: false,
+        message: 'Inscrito nao encontrado'
+      });
+    }
+
+    if (result.rows.length > 1) {
+      console.log('Multiplos inscritos encontrados para ' + searchCriteria + ': ' + result.rows.length);
+      return res.json({
+        success: true,
+        multiple: true,
+        data: result.rows,
+        message: result.rows.length + ' inscritos encontrados. Selecione um para continuar.'
+      });
+    }
+
     const inscrito = result.rows[0];
-    
-    console.log(`📋 Dados do inscrito:`, {
-      nome: inscrito.nome_completo,
-      cpf: inscrito.documento,
-      assinatura_realizada: inscrito.assinatura_realizada,
-      pdf_path: inscrito.pdf_path,
-      tipo_assinatura: typeof inscrito.assinatura_realizada
-    });
-    
-    // Verificar se já foi assinado
+
     const foiAssinado = inscrito.assinatura_realizada === true || inscrito.assinatura_realizada === 't';
     const temPDF = inscrito.pdf_path && inscrito.pdf_path.trim() !== '';
-    
-    console.log(`✅ Verificação de assinatura:`, {
-      foiAssinado,
-      temPDF,
-      statusFinal: foiAssinado && temPDF
-    });
-    
+
     if (foiAssinado && temPDF) {
-      console.log(`✅ Termo já assinado para CPF: ${cpf}`);
       return res.json({
         success: true,
         data: inscrito,
         ja_assinado: true,
         pdf_url: inscrito.pdf_path,
-        message: 'Este CPF já possui termo de responsabilidade assinado'
+        message: 'Este inscrito ja possui termo de responsabilidade assinado'
       });
     }
-    
-    console.log(`📤 Retornando dados do inscrito para o frontend`);
-    res.json({
+
+    return res.json({
       success: true,
       data: inscrito,
       ja_assinado: false
     });
-    
   } catch (error) {
-    console.error('❌ Erro ao buscar inscrito:', error);
-    res.status(500).json({
+    console.error('Erro ao buscar inscrito:', error);
+    return res.status(500).json({
       success: false,
       message: 'Erro interno do servidor',
       error: error.message
@@ -180,44 +298,65 @@ app.get('/api/inscrito/:cpf', async (req, res) => {
   }
 });
 
-// Endpoint para atualizar dados do inscrito
-app.put('/api/inscrito/:cpf', async (req, res) => {
+// Endpoint para atualizar dados do inscrito por order_code
+app.put('/api/inscrito/:order_code', async (req, res) => {
   try {
-    const { cpf } = req.params;
-    const { nome_completo, responsavel, tel_responsavel, contato_nome, contato_telefone } = req.body;
-    
-    console.log(`🔄 Atualizando dados do inscrito CPF: ${cpf}`);
-    console.log(`📝 Novos dados:`, { nome_completo, responsavel, tel_responsavel, contato_nome, contato_telefone });
-    
-    const updateQuery = `
-      UPDATE inscritos 
-      SET nome_completo = $1, responsavel = $2, tel_responsavel = $3, contato_nome = $4, contato_telefone = $5
-      WHERE documento = $6
-      RETURNING *
-    `;
-    
+    const { order_code } = req.params;
+    const {
+      nome_completo,
+      lote,
+      nome_responsavel,
+      telefone_responsavel,
+      tel_responsavel,
+      data_de_nascimento,
+      endereco,
+      idade,
+      lider_de_celula,
+      sexo,
+      contato_nome,
+      contato_telefone
+    } = req.body;
+
+    const nomeResp = nome_responsavel;
+    const telefoneResp = telefone_responsavel || tel_responsavel;
+
+    const updateQuery =
+      'UPDATE inscritos SET ' +
+      'nome_completo = $1, lote = $2, nome_responsavel = $3, telefone_responsavel = $4, ' +
+      'data_de_nascimento = $5, endereco = $6, idade = $7, lider_de_celula = $8, sexo = $9, ' +
+      'contato_nome = $10, contato_telefone = $11 ' +
+      'WHERE order_code = $12 RETURNING *';
+
     const result = await pool.query(updateQuery, [
-      nome_completo, responsavel, tel_responsavel, contato_nome, contato_telefone, cpf
+      nome_completo,
+      lote,
+      nomeResp,
+      telefoneResp,
+      data_de_nascimento,
+      endereco,
+      idade,
+      lider_de_celula,
+      sexo,
+      contato_nome,
+      contato_telefone,
+      order_code
     ]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Inscrito não encontrado'
+        message: 'Inscrito nao encontrado'
       });
     }
-    
-    console.log(`✅ Dados atualizados com sucesso para CPF: ${cpf}`);
-    
-    res.json({
+
+    return res.json({
       success: true,
       data: result.rows[0],
       message: 'Dados atualizados com sucesso'
     });
-    
   } catch (error) {
-    console.error('❌ Erro ao atualizar dados:', error);
-    res.status(500).json({
+    console.error('Erro ao atualizar dados:', error);
+    return res.status(500).json({
       success: false,
       message: 'Erro interno do servidor',
       error: error.message
@@ -225,88 +364,113 @@ app.put('/api/inscrito/:cpf', async (req, res) => {
   }
 });
 
-// 🔧 Endpoint corrigido para gerar PDF
+// Endpoint para gerar PDF
 app.post('/api/gerar-pdf', async (req, res) => {
   try {
-    const { cpf, contato_nome, contato_telefone, dados_editados } = req.body;
-    
-    console.log(`📄 Gerando PDF para CPF: ${cpf}`);
-    console.log(`📞 Contato de emergência:`, { contato_nome, contato_telefone });
-    
-    // Buscar dados do inscrito
-    const result = await pool.query('SELECT * FROM inscritos WHERE documento = $1', [cpf]);
-    
+    const { inscrito_id, order_code, telefone_responsavel, contato_nome, contato_telefone, dados_editados } = req.body;
+    const selector = resolveInscritoSelector({ inscrito_id, order_code, telefone_responsavel });
+
+    if (!selector) {
+      return res.status(400).json({
+        success: false,
+        message: 'inscrito_id ou order_code ou telefone_responsavel e obrigatorio para gerar o PDF'
+      });
+    }
+
+    if (selector.error) {
+      return res.status(400).json({
+        success: false,
+        message: selector.error
+      });
+    }
+
+    const { keyField, keyValue } = selector;
+    const result = await pool.query('SELECT * FROM inscritos WHERE ' + keyField + ' = $1', [keyValue]);
+
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Inscrito não encontrado'
+        message: 'Inscrito nao encontrado'
       });
     }
-    
+
+    if (result.rows.length > 1 && keyField !== 'id') {
+      return res.status(400).json({
+        success: false,
+        message: 'Mais de um inscrito encontrado. Informe inscrito_id para gerar o PDF correto.'
+      });
+    }
+
     let inscrito = result.rows[0];
-    
-    // Se há dados editados, usar eles
+    const inscritoId = inscrito.id;
+
     if (dados_editados) {
       inscrito = { ...inscrito, ...dados_editados };
     }
-    
-    // Atualizar contato de emergência no banco
+
     await pool.query(
-      'UPDATE inscritos SET contato_nome = $1, contato_telefone = $2 WHERE documento = $3',
-      [contato_nome, contato_telefone, cpf]
+      'UPDATE inscritos SET contato_nome = $1, contato_telefone = $2 WHERE id = $3',
+      [contato_nome, contato_telefone, inscritoId]
     );
-    
-    // Se há dados editados, atualizar no banco também
+
     if (dados_editados) {
       await pool.query(
-        'UPDATE inscritos SET nome_completo = $1, responsavel = $2, tel_responsavel = $3 WHERE documento = $4',
-        [dados_editados.nome_completo, dados_editados.responsavel, dados_editados.tel_responsavel, cpf]
+        'UPDATE inscritos SET nome_completo = $1, nome_responsavel = $2, telefone_responsavel = $3 WHERE id = $4',
+        [
+          dados_editados.nome_completo,
+          dados_editados.nome_responsavel || dados_editados.responsavel,
+          dados_editados.telefone_responsavel || dados_editados.tel_responsavel,
+          inscritoId
+        ]
       );
     }
-    
-    // Dados para o PDF
+
     const dados = {
-      NOME_FILHO: inscrito.nome_completo || 'NÃO INFORMADO',
-      NOME_RESPONSAVEL: inscrito.responsavel || 'NÃO INFORMADO',
-      CONTATO_NOME: contato_nome || 'NÃO INFORMADO',
-      CONTATO_TELEFONE: contato_telefone || 'NÃO INFORMADO'
+      NOME_FILHO: inscrito.nome_completo || 'N\u00C3O INFORMADO',
+      NOME_RESPONSAVEL: inscrito.nome_responsavel || inscrito.responsavel || 'N\u00C3O INFORMADO',
+      CONTATO_NOME: contato_nome || 'N\u00C3O INFORMADO',
+      DOCUMENTO: inscrito.documento || 'N\u00C3O INFORMADO',
+      CONTATO_TELEFONE: contato_telefone || 'N\u00C3O INFORMADO'
     };
-    
-    console.log(`📝 Dados para o PDF:`, dados);
-    
-    // 🔧 CRIAR PDF CORRIGIDO
+
     const pdfDoc = await PDFDocument.create();
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    
-    // Configurações da página
-    const pageWidth = 595.28; // A4
-    const pageHeight = 841.89; // A4
+
+    const pageWidth = 595.28;
+    const pageHeight = 841.89;
     const margin = 50;
+    const recuoTopoConteudo = 90;
     const textWidth = pageWidth - (margin * 2);
     const fontSize = 11;
     const titleFontSize = 16;
     const subtitleFontSize = 14;
-    
-    // Primeira página
+    const imagemFundo = await carregarImagemBaseTermo(pdfDoc);
+
     const page1 = pdfDoc.addPage([pageWidth, pageHeight]);
-    let yPosition = pageHeight - margin - 30;
-    
-    // 🔧 TÍTULO CENTRALIZADO
-    const titulo = 'TERMO DE RESPONSABILIDADE E AUTORIZAÇÃO';
-    const tituloWidth = font.widthOfTextAtSize(titulo, titleFontSize);
-    page1.drawText(titulo, {
-      x: (pageWidth - tituloWidth) / 2,
-      y: yPosition,
-      size: titleFontSize,
-      font: fontBold,
-      color: rgb(0, 0, 0),
+    aplicarFundoPagina(page1, imagemFundo);
+    let yPosition = pageHeight - margin - recuoTopoConteudo;
+
+    const titulo = 'TERMO DE RESPONSABILIDADE, AUTORIZA\u00C7\u00C3O E CI\u00CANCIA DAS NORMAS';
+    const titleHorizontalMargin = margin + 24;
+    const titleMaxWidth = pageWidth - (titleHorizontalMargin * 2);
+    const titleLines = quebrarTexto(titulo, fontBold, titleFontSize, titleMaxWidth);
+    const titleLineHeight = titleFontSize + 4;
+
+    titleLines.forEach((line, index) => {
+      const lineWidth = fontBold.widthOfTextAtSize(line, titleFontSize);
+      page1.drawText(line, {
+        x: (pageWidth - lineWidth) / 2,
+        y: yPosition - (index * titleLineHeight),
+        size: titleFontSize,
+        font: fontBold,
+        color: rgb(0, 0, 0),
+      });
     });
-    
-    yPosition -= 30;
-    
-    // 🔧 SUBTÍTULO CENTRALIZADO
-    const subtitulo = 'ACAMP RELEVANTE JUNIORS 2025';
+
+    yPosition -= (titleLines.length * titleLineHeight) + 12;
+
+    const subtitulo = 'ACAMP RELEVANTEEN 2026';
     const subtituloWidth = font.widthOfTextAtSize(subtitulo, subtitleFontSize);
     page1.drawText(subtitulo, {
       x: (pageWidth - subtituloWidth) / 2,
@@ -315,97 +479,136 @@ app.post('/api/gerar-pdf', async (req, res) => {
       font: fontBold,
       color: rgb(0, 0, 0),
     });
-    
+
     yPosition -= 50;
-    
-    // 🔧 CONTEÚDO DO TERMO CORRIGIDO
+
     const paragrafos = [
-      `Eu, {NOME_RESPONSAVEL}, responsável pelo(a) {NOME_FILHO}, autorizo sua participação no ACAMP RELEVANTE JUNIORS 2025, que será realizado nos dias 25 a 27 de julho de 2025 no Centro de Treinamento Oração e Comunhão - CTOC, Campo Grande/MS.`,
-      
-      `Autorizo os responsáveis pelo ACAMP RELEVANTE JUNIORS 2025, em caso de acidente ou problemas de saúde, a conduzir meu/minha filho(a) para os primeiros socorros em qualquer Pronto Socorro de Campo Grande/MS, se necessário.`,
-      
-      `Autorizo o uso da imagem registrada em foto ou vídeo do acampante, sem finalidade comercial, para postagens nas redes sociais (Instagram, Facebook e site oficial da Igreja Evangélica Comunidade Global) do ACAMP RELEVANTE JUNIORS 2025, sendo que a autorização se limita às imagens registradas no contexto do acampamento e suas programações.`,
-      
-      `Estou ciente de que, no caso de extravio de qualquer objeto de valor em posse do acampante (câmera fotográfica, celular, lanterna, relógio, etc.), não haverá reembolso, sendo de minha total responsabilidade.`,
-      
-      `Estou ciente de que será de minha responsabilidade todo e qualquer dano material contra o patrimônio do CTOC (local de realização do ACAMP RELEVANTE JUNIORS 2025), desde que comprovada a responsabilidade do meu/minha filho(a) no ocorrido.`,
-      
-      `Estou ciente de que, com o objetivo de contribuir para o bom aproveitamento dos acampantes, NÃO é aconselhável a visita/presença ou comunicação telefônica por parte dos pais, responsáveis ou parentes durante a temporada.`,
-      
-      `Em caso de emergência, a coordenação do ACAMP RELEVANTE JUNIORS 2025 entrará em contato com os responsáveis.`,
-      
-      `Em caso de ausência, autorizo a coordenação do ACAMP RELEVANTE JUNIORS 2025 a entrar em contato com a seguinte pessoa: NOME: {CONTATO_NOME} TELEFONE: {CONTATO_TELEFONE}`,
-      
-      `Estou ciente de que, em caso de mau comportamento ou desobediência às regras do ACAMP RELEVANTE JUNIORS 2025, o responsável deverá buscar o adolescente no evento, sem direito a devolução do valor da inscrição.`,
-      
-      `Estou ciente de que será proibido o uso de celular durante o acampamento, sendo o uso e zelo do aparelho de total responsabilidade dele(a), assim como as consequências de seu uso indevido.`,
-      
-      `Declaro que li e compreendi todos os termos acima, concordando integralmente com as condições estabelecidas. Isento a organização do evento de qualquer responsabilidade por danos pessoais ou materiais, desde que comprovada a responsabilidade do meu(minha) filho(a) no ocorrido.`
+      'Eu, {NOME_RESPONSAVEL}, CPF n\u00BA {DOCUMENTO}, respons\u00E1vel legal pelo(a) pr\u00E9-adolescente {NOME_FILHO}, doravante denominado(a) ACAMPANTE, declaro para os devidos fins que:',
+      '1. AUTORIZA\u00C7\u00C3O DE PARTICIPA\u00C7\u00C3O',
+      'Autorizo o(a) ACAMPANTE a participar de todas as atividades, ministra\u00E7\u00F5es, programa\u00E7\u00F5es recreativas, esportivas, espirituais e demais din\u00E2micas realizadas no ACAMP RELEVANTEEN 2026, promovido pela Igreja Evang\u00E9lica Comunidade Global.',
+      'Declaro estar ciente de que o evento possui programa\u00E7\u00E3o organizada, normas internas e acompanhamento por equipe de l\u00EDderes, volunt\u00E1rios e coordena\u00E7\u00E3o.',
+      '2. AUTORIZA\u00C7\u00C3O PARA ATENDIMENTO M\u00C9DICO',
+      'Autorizo, em caso de acidente, mal-estar ou necessidade m\u00E9dica, que a coordena\u00E7\u00E3o do evento encaminhe o(a) ACAMPANTE para atendimento em hospital, pronto socorro ou unidade de sa\u00FAde de Campo Grande/MS, podendo inclusive autorizar procedimentos emergenciais necess\u00E1rios \u00E0 preserva\u00E7\u00E3o da vida e da sa\u00FAde.',
+      'Comprometo-me a fornecer todas as informa\u00E7\u00F5es m\u00E9dicas relevantes (alergias, uso de medicamentos, restri\u00E7\u00F5es alimentares, condi\u00E7\u00F5es pr\u00E9-existentes).',
+      '3. AUTORIZA\u00C7\u00C3O DE USO DE IMAGEM',
+      'Autorizo, de forma gratuita e por prazo indeterminado, o uso da imagem do(a) ACAMPANTE registrada em fotografias ou v\u00EDdeos produzidos no contexto do evento, exclusivamente para divulga\u00E7\u00E3o institucional, sem finalidade comercial, nas redes sociais, site oficial e demais meios de comunica\u00E7\u00E3o da Igreja Evang\u00E9lica Comunidade Global e do ACAMP RELEVANTEEN.',
+      '4. RESPONSABILIDADE POR OBJETOS PESSOAIS',
+      'Declaro estar ciente de que a organiza\u00E7\u00E3o n\u00E3o se responsabiliza por extravio, perda ou dano de objetos pessoais de valor (celulares, c\u00E2meras, rel\u00F3gios, joias, entre outros), sendo de inteira responsabilidade do(a) ACAMPANTE e de seus respons\u00E1veis.',
+      '5. RESPONSABILIDADE POR DANOS AO PATRIM\u00D4NIO',
+      'Comprometo-me a ressarcir integralmente eventuais danos materiais causados pelo(a) ACAMPANTE ao patrim\u00F4nio do local do evento (CTOC) ou a terceiros, desde que comprovada sua responsabilidade.',
+      '6. CI\u00CANCIA DAS NORMAS DE CONDUTA E SEGURAN\u00C7A',
+      'Declaro estar ciente de que o ACAMP RELEVANTEEN adota Pol\u00EDtica de Seguran\u00E7a Infantil e C\u00F3digo de Estilo de Vida em Comunidade, com base na legisla\u00E7\u00E3o brasileira, especialmente no Estatuto da Crian\u00E7a e do Adolescente.',
+      'Estou ciente de que:',
+      'N\u00E3o s\u00E3o permitidos comportamentos violentos, ofensivos, discriminat\u00F3rios ou desrespeitosos.',
+      '\u00C9 proibido porte ou uso de drogas il\u00EDcitas, \u00E1lcool, tabaco (inclusive cigarro eletr\u00F4nico), armas ou objetos perigosos.',
+      'S\u00E3o proibidas pr\u00E1ticas de bullying, intimida\u00E7\u00E3o, amea\u00E7as ou qualquer forma de abuso.',
+      'O uso de linguagem ofensiva, preconceituosa ou vulgar n\u00E3o ser\u00E1 tolerado.',
+      'O acesso aos dormit\u00F3rios ser\u00E1 restrito conforme divis\u00E3o por sexo.',
+      'O cumprimento de horarios, regras de vestuario e participacao na programacao e obrigatorio.',
+      '\u00C9 obrigatorio o uso de identificacao do evento.',
+      '\u00C9 vedada qualquer conduta que coloque em risco a integridade fisica, emocional, psicologica ou espiritual dos participantes.',
+      '7. POL\u00CDTICA DE PROTE\u00C7\u00C3O E SEGURAN\u00C7A DO MENOR',
+      'A organizacao compromete-se a:',
+      'Garantir ambiente seguro e supervisionado.',
+      'Proteger os pre-adolescentes contra qualquer forma de abuso (fisico, emocional, sexual ou espiritual).',
+      'Adotar medidas imediatas em caso de suspeita ou ocorrencia de violacao de direitos.',
+      'Comunicar responsaveis e autoridades competentes quando necessario.',
+      'Da mesma forma, declaro estar ciente de que qualquer situacao grave revelada pelo(a) ACAMPANTE podera ser encaminhada a Supervisao Pastoral e, quando exigido por lei, as autoridades competentes.',
+      '8. MEDIDAS DISCIPLINARES',
+      'Estou ciente de que, em caso de:',
+      'Mau comportamento;',
+      'Desobediencia as regras;',
+      'Condutas que coloquem em risco outros participantes;',
+      'o(a) ACAMPANTE podera ser desligado(a) do evento, devendo o responsavel providenciar sua retirada imediata, sem direito a devolucao do valor da inscricao.',
+      '9. DECLARACAO FINAL',
+      'Declaro que:',
+      'Li integralmente este Termo;',
+      'Compreendi todas as clausulas;',
+      'Estou de acordo com as normas estabelecidas;',
+      'Autorizo a participacao do(a) ACAMPANTE conforme as condicoes aqui descritas.',
+      'Por ser expressao da verdade, firmo o presente Termo.'
     ];
-    
-    // 🔧 VARIÁVEL PARA PÁGINA ATUAL (LET EM VEZ DE CONST)
-    let paginaAtual = page1; // ✅ CORREÇÃO: let em vez de const
-    
-    // 🔧 DESENHAR PARÁGRAFOS COM FORMATAÇÃO CORRETA
+
+    let paginaAtual = page1;
+    let tipoListaAtual = null;
+
     paragrafos.forEach((paragrafo, index) => {
-      // Processar campos dinâmicos
-      const textoProcessado = processarCampos(paragrafo, dados);
-      
-      // Desenhar parágrafo justificado
-      yPosition = desenharTextoJustificado(paginaAtual, textoProcessado, margin, yPosition, fontSize, font, textWidth, 16);
-      
-      // Espaço entre parágrafos
-      yPosition -= 10;
-      
-      // Se chegou no final da página, criar nova página
+      const textoOriginal = String(paragrafo || '').trim();
+
+      if (/^\d+\.\s/.test(textoOriginal)) {
+        tipoListaAtual = null;
+      }
+
+      const novoTipoLista = tipoListaPorCabecalho(textoOriginal);
+      if (novoTipoLista) {
+        tipoListaAtual = novoTipoLista;
+      }
+
+      const usarNegrito = paragrafoDeveNegrito(textoOriginal);
+      const fonteParagrafo = usarNegrito ? fontBold : font;
+      const espacoEntreLinhas = usarNegrito ? 17 : 16;
+      let justificar = !usarNegrito;
+      let recuoX = 0;
+      let espacoAposParagrafo = 10;
+
+      let textoProcessado = processarCampos(textoOriginal, dados);
+      const itemLista = ehItemDeLista(textoOriginal, tipoListaAtual);
+
+      if (itemLista) {
+        textoProcessado = '- ' + textoProcessado;
+        recuoX = 18;
+        justificar = false;
+        espacoAposParagrafo = 6;
+      }
+
+      yPosition = desenharTextoJustificado(
+        paginaAtual,
+        textoProcessado,
+        margin + recuoX,
+        yPosition,
+        fontSize,
+        fonteParagrafo,
+        textWidth - recuoX,
+        espacoEntreLinhas,
+        justificar
+      );
+      yPosition -= espacoAposParagrafo;
+
       if (yPosition < 150 && index < paragrafos.length - 1) {
         const page2 = pdfDoc.addPage([pageWidth, pageHeight]);
-        yPosition = pageHeight - margin - 30;
-        
-        // 🔧 CORREÇÃO: Reatribuir variável let em vez de const
-        paginaAtual = page2; // ✅ CORREÇÃO: Agora funciona porque é let
+        aplicarFundoPagina(page2, imagemFundo);
+        yPosition = pageHeight - margin - recuoTopoConteudo;
+        paginaAtual = page2;
       }
     });
 
-    
-    console.log(`📝 PDF inicial criado SEM área de assinatura`);
-    
-    // Salvar PDF
     const pdfBytes = await pdfDoc.save();
-    
-    // Criar diretório se não existir
+
     const diretorioAssinados = path.join(__dirname, 'public', 'assinados');
     try {
       await fs.access(diretorioAssinados);
     } catch {
       await fs.mkdir(diretorioAssinados, { recursive: true });
     }
-    
-    // Salvar arquivo
-    const nomeArquivo = `${cpf}.pdf`;
+
+    const nomeArquivo = nomeArquivoSeguro(inscrito.order_code || inscrito.telefone_responsavel, inscritoId);
     const caminhoCompleto = path.join(diretorioAssinados, nomeArquivo);
     await fs.writeFile(caminhoCompleto, pdfBytes);
-    
-    // Atualizar banco com caminho correto (sem /public)
-    const pdfPath = `/assinados/${nomeArquivo}`;
+
+    const pdfPath = '/assinados/' + nomeArquivo;
     await pool.query(
-      'UPDATE inscritos SET pdf_path = $1, assinatura_realizada = false WHERE documento = $2',
-      [pdfPath, cpf]
+      'UPDATE inscritos SET pdf_path = $1, assinatura_realizada = false WHERE id = $2',
+      [pdfPath, inscritoId]
     );
-    
-    console.log(`✅ PDF gerado com sucesso: ${pdfPath}`);
-    console.log(`🔗 URL de acesso: http://localhost:3001${pdfPath}`);
-    console.log(`📁 Caminho físico do PDF: ${caminhoCompleto}`);
-    
-    res.json({
+
+    return res.json({
       success: true,
       pdf_url: pdfPath,
       message: 'PDF gerado com sucesso'
     });
-    
   } catch (error) {
-    console.error('❌ Erro ao gerar PDF:', error);
-    res.status(500).json({
+    console.error('Erro ao gerar PDF:', error);
+    return res.status(500).json({
       success: false,
       message: 'Erro interno do servidor',
       error: error.message
@@ -416,12 +619,29 @@ app.post('/api/gerar-pdf', async (req, res) => {
 // Endpoint para atualizar assinatura
 app.post('/api/atualizar-assinatura', async (req, res) => {
   try {
-    const { cpf, assinatura } = req.body;
-    
-    console.log(`✍️ Atualizando assinatura para CPF: ${cpf}`);
-    
+    const { inscrito_id, order_code, telefone_responsavel, assinatura } = req.body;
+    const selector = resolveInscritoSelector({ inscrito_id, order_code, telefone_responsavel });
+
+    if (!selector) {
+      return res.status(400).json({
+        success: false,
+        message: 'inscrito_id ou order_code ou telefone_responsavel e obrigatorio para atualizar assinatura'
+      });
+    }
+
+
+    if (selector.error) {
+      return res.status(400).json({
+        success: false,
+        message: selector.error
+      });
+    }
+
+    const { keyField, keyValue } = selector;
+    console.log('Atualizando assinatura para ' + keyField + ': ' + keyValue);
+
     // Buscar dados do inscrito
-    const result = await pool.query('SELECT * FROM inscritos WHERE documento = $1', [cpf]);
+    const result = await pool.query(`SELECT * FROM inscritos WHERE ${keyField} = $1`, [keyValue]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({
@@ -430,6 +650,13 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
       });
     }
     
+    if (result.rows.length > 1 && keyField !== 'id') {
+      return res.status(400).json({
+        success: false,
+        message: 'Mais de um inscrito encontrado. Informe inscrito_id para assinar o termo correto.'
+      });
+    }
+
     const inscrito = result.rows[0];
     
     if (!inscrito.pdf_path) {
@@ -442,7 +669,7 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     // Construir caminho físico correto
     const caminhoFisico = path.join(__dirname, 'public', inscrito.pdf_path.replace('/assinados/', 'assinados/'));
     
-    console.log(`📁 Caminho físico do PDF: ${caminhoFisico}`);
+    console.log(`x Caminho físico do PDF: ${caminhoFisico}`);
     
     // Ler PDF existente
     const pdfBytes = await fs.readFile(caminhoFisico);
@@ -460,33 +687,32 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     
     // Dados para a assinatura
     const dados = {
-      nomeResponsavel: inscrito.responsavel || 'NÃO INFORMADO',
+      nomeResponsavel: inscrito.nome_responsavel || 'NÃO INFORMADO',
+      documento: inscrito.documento || 'NÃO INFORMADO',
       data: dayjs().format('DD/MM/YYYY')
     };
     
      // 🔧 CALCULAR POSIÇÃO DINÂMICA DA ASSINATURA
     // Buscar posição aproximada do último texto na página
-    const margin = 50;
-    const fontSize = 11;
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     
-    // 🔧 POSIÇÃO MAIS PRÓXIMA DO ÚLTIMO TEXTO
+    // x POSI!ÒO MAIS PRXIMA DO aLTIMO TEXTO
     // Estimar posição baseada no conteúdo típico do documento
     let yAssinatura;
     
     if (pages.length === 1) {
       // Se é uma página só, assinatura mais embaixo
-      yAssinatura = height - 650; // Aproximadamente onde termina o texto na página 1
+      yAssinatura = 130;
     } else {
       // Se são duas páginas, assinatura logo após o último parágrafo da página 2
-      yAssinatura = height - 200; // 🔧 POSIÇÃO MAIS ALTA - Logo após o último texto
+      yAssinatura = 180;
     }
     
     console.log(`📍 Posição da assinatura calculada: ${yAssinatura} (altura da página: ${height})`);
     
-    // 🔧 ESPAÇO ANTES DA ASSINATURA (MENOR)
-    yAssinatura -= 50; // Espaço reduzido entre último texto e assinatura
+    // x ESPA!O ANTES DA ASSINATURA (MENOR)
+    // Mantém a assinatura mais baixa para não conflitar com o texto final.
     
     // Adicionar assinatura digital
     lastPage.drawImage(pngImage, {
@@ -504,11 +730,19 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
       font: fontBold,
       color: rgb(0, 0, 0),
     });
+    lastPage.drawText(`CPF: ${dados.documento}`, {
+      x: 50,
+      y: yAssinatura - 40,
+      size: 11,
+      font: font,
+      color: rgb(0, 0, 0),
+    });
+
     const dataLocal = `Campo Grande/MS, ${dados.data}`;
  
     lastPage.drawText(dataLocal, {
       x: 50,
-      y: yAssinatura - 40,
+      y: yAssinatura - 60,
       size: 11,
       font: font,
       color: rgb(0, 0, 0),
@@ -521,11 +755,11 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     
     // Atualizar status no banco
     await pool.query(
-      'UPDATE inscritos SET assinatura_realizada = true WHERE documento = $1',
-      [cpf]
+      'UPDATE inscritos SET assinatura_realizada = true WHERE id = $1',
+      [inscrito.id]
     );
     
-    console.log(`✅ Assinatura adicionada com sucesso para CPF: ${cpf}`);
+    console.log(`✅ Assinatura adicionada com sucesso para ${keyField}: ${keyValue}`);
     
     res.json({
       success: true,
@@ -548,21 +782,18 @@ app.get('/api/validados', async (req, res) => {
   try {
     console.log('🔍 Buscando termos validados...');
     
-    const { busca, campus, page = 1, limit = 50 } = req.query;
+    const { busca, page = 1, limit = 50 } = req.query;
     
     let query = `
       SELECT 
         id,
+        order_code,
         nome_completo,
-        documento,
-        email,
-        celular,
-        data_nascimento,
-        campus,
+        nome_responsavel,
+        telefone_responsavel,
+        data_de_nascimento,
         idade,
-        responsavel,
-        tel_responsavel,
-        lider_celula,
+        lider_de_celula AS lider_celula,
         assinatura_realizada,
         pdf_path,
         contato_nome,
@@ -576,20 +807,14 @@ app.get('/api/validados', async (req, res) => {
     const params = [];
     let paramCount = 0;
     
-    // Filtro por busca (nome ou CPF)
+    // Filtro por busca (nome, order_code ou telefone_responsavel)
     if (busca && busca.trim() !== '') {
       paramCount++;
-      query += ` AND (nome_completo ILIKE $${paramCount} OR documento ILIKE $${paramCount})`;
+      query += ` AND (nome_completo ILIKE $${paramCount} OR order_code ILIKE $${paramCount} OR telefone_responsavel ILIKE $${paramCount})`;
       params.push(`%${busca.trim()}%`);
     }
     
-    // Filtro por campus
-    if (campus && campus.trim() !== '') {
-      paramCount++;
-      query += ` AND campus ILIKE $${paramCount}`;
-      params.push(`%${campus.trim()}%`);
-    }
-    
+    // (não aplica mais filtro por campus)
     
     // Ordenação
     query += ` ORDER BY id DESC`;
@@ -621,15 +846,11 @@ app.get('/api/validados', async (req, res) => {
     // Aplicar os mesmos filtros na contagem
     if (busca && busca.trim() !== '') {
       countParamCount++;
-      countQuery += ` AND (nome_completo ILIKE $${countParamCount} OR documento ILIKE $${countParamCount})`;
+      countQuery += ` AND (nome_completo ILIKE $${countParamCount} OR order_code ILIKE $${countParamCount} OR telefone_responsavel ILIKE $${countParamCount})`;
       countParams.push(`%${busca.trim()}%`);
     }
     
-    if (campus && campus.trim() !== '') {
-      countParamCount++;
-      countQuery += ` AND campus ILIKE $${countParamCount}`;
-      countParams.push(`%${campus.trim()}%`);
-    }
+    // (não aplica mais filtro por campus)
     
     const countResult = await pool.query(countQuery, countParams);
     const total = parseInt(countResult.rows[0].total);
@@ -638,12 +859,13 @@ app.get('/api/validados', async (req, res) => {
     const validados = result.rows.map(inscrito => ({
       ...inscrito,
       pdf_url: inscrito.pdf_path,
-      cpf_formatado: inscrito.documento.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
-      data_nascimento_formatada: inscrito.data_nascimento ? 
-        new Date(inscrito.data_nascimento).toLocaleDateString('pt-BR') : 'N/A'
+      order_code: inscrito.order_code,
+      telefone_responsavel: inscrito.telefone_responsavel,
+      data_nascimento_formatada: inscrito.data_de_nascimento ? 
+        new Date(inscrito.data_de_nascimento).toLocaleDateString('pt-BR') : 'N/A'
     }));
     
-    console.log(`✅ Encontrados ${validados.length} termos validados de ${total} total`);
+    console.log(`🆕ncontrados ${validados.length} termos validados de ${total} total`);
     
     res.json({
       success: true,
@@ -655,8 +877,7 @@ app.get('/api/validados', async (req, res) => {
         totalPages: Math.ceil(total / limit)
       },
       filters: {
-        busca,
-        campus
+        busca
       }
     });
     
@@ -677,23 +898,17 @@ app.get('/api/validados/stats', async (req, res) => {
     
     const statsQuery = `
       SELECT 
-        COUNT(*) as total_assinados,
-        COUNT(DISTINCT campus) as total_campus,
-        campus,
-        COUNT(*) as total_por_campus
+        COUNT(*) as total_assinados
       FROM inscritos 
       WHERE assinatura_realizada = true 
       AND pdf_path IS NOT NULL 
       AND pdf_path != ''
-      GROUP BY ROLLUP(campus)
-      ORDER BY campus NULLS LAST
     `;
     
     const result = await pool.query(statsQuery);
     
     // Separar estatísticas gerais e por campus
-    const estatisticasGerais = result.rows.find(row => row.campus === null);
-    const estatisticasPorCampus = result.rows.filter(row => row.campus !== null);
+    const totalAssinados = parseInt(result.rows[0]?.total_assinados || 0);
     
     console.log('✅ Estatísticas calculadas com sucesso');
     
@@ -701,13 +916,10 @@ app.get('/api/validados/stats', async (req, res) => {
       success: true,
       data: {
         geral: {
-          total_assinados: parseInt(estatisticasGerais?.total_assinados || 0),
-          total_campus: parseInt(estatisticasGerais?.total_campus || 0)
+          total_assinados: totalAssinados,
+          total_campus: 0
         },
-        por_campus: estatisticasPorCampus.map(stat => ({
-          campus: stat.campus,
-          total: parseInt(stat.total_por_campus)
-        }))
+        por_campus: []
       }
     });
     
@@ -753,4 +965,3 @@ app.listen(port, '0.0.0.0', () => {
 });
 
 module.exports = app;
-

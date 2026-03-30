@@ -1,4 +1,4 @@
-/* App.css FINAL AJUSTADO - Com validação CPF e tela para termos já assinados */
+/* App.css FINAL AJUSTADO - Com validação de order_code/telefone e tela para termos já assinados */
 
 * {
   margin: 0;
@@ -64,7 +64,7 @@ body {
   align-items: center;
 }
 
-.cpf-input {
+.search-input {
   flex: 1;
   padding: 15px 20px;
   border: 2px solid #e1e8ed;
@@ -74,7 +74,7 @@ body {
   background: #f8f9fa;
 }
 
-.cpf-input:focus {
+.search-input:focus {
   outline: none;
   border-color: #667eea;
   background: white;
@@ -105,8 +105,116 @@ body {
   transform: none;
 }
 
-/* 🆕 CPF Validation */
-.cpf-validation {
+/* Selection Section (múltiplos inscritos) */
+.selection-section {
+  background: #f8f9fc;
+  border: 1px solid #e3e8f2;
+  border-radius: 14px;
+  padding: 24px;
+  margin-top: 20px;
+}
+
+.selection-section h2 {
+  color: #1f3550;
+  font-size: 1.8rem;
+  margin-bottom: 8px;
+}
+
+.selection-description {
+  color: #5f6f83;
+  margin-bottom: 18px;
+  line-height: 1.4;
+}
+
+.list-group {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.list-item {
+  background: #ffffff;
+  border: 1px solid #dce5f2;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.list-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(16, 43, 77, 0.08);
+}
+
+.list-item.is-pending {
+  border-left: 4px solid #d08925;
+}
+
+.list-item.is-signed {
+  border-left: 4px solid #2a9b4d;
+}
+
+.list-item-info {
+  min-width: 0;
+}
+
+.list-item-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #223b58;
+  margin-bottom: 4px;
+}
+
+.list-item-secondary {
+  color: #607287;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  word-break: break-word;
+}
+
+.list-status {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.list-status.pending {
+  color: #9a5d05;
+}
+
+.list-status.signed {
+  color: #1f7a3d;
+}
+
+.select-button {
+  background: linear-gradient(135deg, #2f66db 0%, #4f46c4 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.select-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(47, 102, 219, 0.25);
+}
+
+.select-button:focus-visible {
+  outline: 3px solid rgba(47, 102, 219, 0.25);
+  outline-offset: 2px;
+}
+
+/* 🆕 Validação de Busca */
+.search-validation {
   margin-top: 10px;
   text-align: center;
 }
@@ -641,6 +749,15 @@ body {
   
   .simple-edit-form {
     grid-template-columns: 1fr;
+  }
+
+  .list-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .select-button {
+    width: 100%;
   }
   
   .signed-icon {

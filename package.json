@@ -23,7 +23,8 @@
     "logs:server": "cd server && npm run dev",
     "logs:client": "cd client && npm start",
     "reset": "npm run fix-ports && node -e \"const fs = require('fs'); const path = require('path'); ['node_modules', 'server/node_modules', 'client/node_modules'].forEach(dir => { try { fs.rmSync(dir, {recursive: true, force: true}); console.log('🗑️ Removido:', dir); } catch(e) {} });\" && npm run install:all",
-    "help": "node -e \"console.log('📋 Comandos disponíveis:'); console.log('  npm run dev          - Rodar sistema completo'); console.log('  npm run setup        - Configuração inicial'); console.log('  npm run fix-ports    - Limpar portas ocupadas'); console.log('  npm run test:system  - Testar se tudo funciona'); console.log('  npm run reset        - Reset completo');\""
+    "help": "node -e \"console.log('📋 Comandos disponíveis:'); console.log('  npm run dev          - Rodar sistema completo'); console.log('  npm run setup        - Configuração inicial'); console.log('  npm run fix-ports    - Limpar portas ocupadas'); console.log('  npm run test:system  - Testar se tudo funciona'); console.log('  npm run reset        - Reset completo');\"",
+    "update:documentos": "node update-documento-inscritos.js"
   },
   "keywords": [
     "pdf",
@@ -48,6 +49,9 @@
   "repository": {
     "type": "git",
     "url": "local"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "pg": "^8.20.0"
   }
 }
-
