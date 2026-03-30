@@ -1,10 +1,14 @@
-﻿// App.jsx DADOS CORRIGIDO - Preenchimento correto dos dados do inscrito
+// App.jsx DADOS CORRIGIDO - Preenchimento correto dos dados do inscrito
 import React, { useState, useRef, useEffect } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import Validados from './Validados';
 import './App.css';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:3001';
+const API_BASE_URL = process.env.REACT_APP_API_URL
+  || ((process.env.REACT_APP_HOST && process.env.REACT_APP_API_PORT)
+    ? `${process.env.REACT_APP_HOST}:${process.env.REACT_APP_API_PORT}`
+    : '')
+  || 'http://localhost:3001';
 
 function App() {
   const [busca, setBusca] = useState('');

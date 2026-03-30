@@ -2,7 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import './Validados.css';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:3001';
+const API_BASE_URL = process.env.REACT_APP_API_URL
+  || ((process.env.REACT_APP_HOST && process.env.REACT_APP_API_PORT)
+    ? `${process.env.REACT_APP_HOST}:${process.env.REACT_APP_API_PORT}`
+    : '')
+  || 'http://localhost:3001';
 
 function Validados() {
   // Estados para validados

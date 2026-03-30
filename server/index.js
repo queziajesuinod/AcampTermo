@@ -9,7 +9,8 @@ const dayjs = require('dayjs');
 require('dotenv').config();
 
 const app = express();
-const port = process.env.PORT || 3001;
+const port = Number(process.env.API_PORT || process.env.PORT || 3001);
+const host = (process.env.HOST || `http://localhost:${port}`).replace(/\/$/, '');
 
 // Middleware
 app.use(cors());
@@ -130,14 +131,14 @@ function paragrafoDeveNegrito(paragrafo) {
 
   return (
     texto === 'Estou ciente de que:' ||
-    texto === 'A organizacao compromete-se a:' ||
+    texto === 'A organização compromete-se a:' ||
     texto === 'Declaro que:'
   );
 }
 
 function tipoListaPorCabecalho(texto) {
   if (texto === 'Estou ciente de que:') return 'conduta';
-  if (texto === 'A organizacao compromete-se a:') return 'protecao';
+  if (texto === 'A organização compromete-se a:') return 'protecao';
   if (texto === 'Estou ciente de que, em caso de:') return 'medidas';
   if (texto === 'Declaro que:') return 'declaracao';
   return null;
@@ -153,7 +154,7 @@ function ehItemDeLista(texto, tipoListaAtual) {
   if (tipoListaAtual === 'protecao') {
     return (
       !/^\d+\.\s/.test(texto) &&
-      texto !== 'A organizacao compromete-se a:' &&
+      texto !== 'A organização compromete-se a:' &&
       !texto.startsWith('Da mesma forma')
     );
   }
@@ -199,7 +200,7 @@ async function carregarImagemBaseTermo(pdfDoc) {
     const imagemBytes = await fs.readFile(caminhoBaseTermo);
     return await pdfDoc.embedJpg(imagemBytes);
   } catch (error) {
-    console.warn('Nao foi possivel carregar basetermo.jpg. PDF sera gerado sem fundo.', error.message);
+    console.warn('Não foi possível carregar basetermo.jpg. O PDF será gerado sem fundo.', error.message);
     return null;
   }
 }
@@ -225,7 +226,7 @@ app.get('/api/inscrito', async (req, res) => {
     if (!order_code && !telefone_responsavel) {
       return res.status(400).json({
         success: false,
-        message: 'Informe order_code ou telefone_responsavel na consulta'
+        message: 'Informe order_code ou telefone do responsável na consulta'
       });
     }
 
@@ -251,15 +252,15 @@ app.get('/api/inscrito', async (req, res) => {
     const result = await pool.query(query, params);
 
     if (result.rows.length === 0) {
-      console.log('Inscrito nao encontrado para ' + searchCriteria);
+      console.log('Inscrito não encontrado para ' + searchCriteria);
       return res.status(404).json({
         success: false,
-        message: 'Inscrito nao encontrado'
+        message: 'Inscrito não encontrado'
       });
     }
 
     if (result.rows.length > 1) {
-      console.log('Multiplos inscritos encontrados para ' + searchCriteria + ': ' + result.rows.length);
+      console.log('Múltiplos inscritos encontrados para ' + searchCriteria + ': ' + result.rows.length);
       return res.json({
         success: true,
         multiple: true,
@@ -345,7 +346,7 @@ app.put('/api/inscrito/:order_code', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Inscrito nao encontrado'
+        message: 'Inscrito não encontrado'
       });
     }
 
@@ -373,7 +374,7 @@ app.post('/api/gerar-pdf', async (req, res) => {
     if (!selector) {
       return res.status(400).json({
         success: false,
-        message: 'inscrito_id ou order_code ou telefone_responsavel e obrigatorio para gerar o PDF'
+        message: 'inscrito_id ou order_code ou telefone_responsavel é obrigatório para gerar o PDF'
       });
     }
 
@@ -390,7 +391,7 @@ app.post('/api/gerar-pdf', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Inscrito nao encontrado'
+        message: 'Inscrito não encontrado'
       });
     }
 
@@ -426,11 +427,11 @@ app.post('/api/gerar-pdf', async (req, res) => {
     }
 
     const dados = {
-      NOME_FILHO: inscrito.nome_completo || 'N\u00C3O INFORMADO',
-      NOME_RESPONSAVEL: inscrito.nome_responsavel || inscrito.responsavel || 'N\u00C3O INFORMADO',
-      CONTATO_NOME: contato_nome || 'N\u00C3O INFORMADO',
-      DOCUMENTO: inscrito.documento || 'N\u00C3O INFORMADO',
-      CONTATO_TELEFONE: contato_telefone || 'N\u00C3O INFORMADO'
+      NOME_FILHO: inscrito.nome_completo || 'NÃO INFORMADO',
+      NOME_RESPONSAVEL: inscrito.nome_responsavel || inscrito.responsavel || 'NÃO INFORMADO',
+      CONTATO_NOME: contato_nome || 'NÃO INFORMADO',
+      DOCUMENTO: inscrito.documento || 'NÃO INFORMADO',
+      CONTATO_TELEFONE: contato_telefone || 'NÃO INFORMADO'
     };
 
     const pdfDoc = await PDFDocument.create();
@@ -504,29 +505,29 @@ app.post('/api/gerar-pdf', async (req, res) => {
       'S\u00E3o proibidas pr\u00E1ticas de bullying, intimida\u00E7\u00E3o, amea\u00E7as ou qualquer forma de abuso.',
       'O uso de linguagem ofensiva, preconceituosa ou vulgar n\u00E3o ser\u00E1 tolerado.',
       'O acesso aos dormit\u00F3rios ser\u00E1 restrito conforme divis\u00E3o por sexo.',
-      'O cumprimento de horarios, regras de vestuario e participacao na programacao e obrigatorio.',
-      '\u00C9 obrigatorio o uso de identificacao do evento.',
-      '\u00C9 vedada qualquer conduta que coloque em risco a integridade fisica, emocional, psicologica ou espiritual dos participantes.',
+      'O cumprimento de horários, regras de vestuário e participação na programação é obrigatório.',
+      'É obrigatório o uso de identificação do evento.',
+      'É vedada qualquer conduta que coloque em risco a integridade física, emocional, psicológica ou espiritual dos participantes.',
       '7. POL\u00CDTICA DE PROTE\u00C7\u00C3O E SEGURAN\u00C7A DO MENOR',
-      'A organizacao compromete-se a:',
+      'A organização compromete-se a:',
       'Garantir ambiente seguro e supervisionado.',
-      'Proteger os pre-adolescentes contra qualquer forma de abuso (fisico, emocional, sexual ou espiritual).',
-      'Adotar medidas imediatas em caso de suspeita ou ocorrencia de violacao de direitos.',
-      'Comunicar responsaveis e autoridades competentes quando necessario.',
-      'Da mesma forma, declaro estar ciente de que qualquer situacao grave revelada pelo(a) ACAMPANTE podera ser encaminhada a Supervisao Pastoral e, quando exigido por lei, as autoridades competentes.',
+      'Proteger os pré-adolescentes contra qualquer forma de abuso (físico, emocional, sexual ou espiritual).',
+      'Adotar medidas imediatas em caso de suspeita ou ocorrência de violação de direitos.',
+      'Comunicar responsáveis e autoridades competentes quando necessário.',
+      'Da mesma forma, declaro estar ciente de que qualquer situação grave revelada pelo(a) ACAMPANTE poderá ser encaminhada à Supervisão Pastoral e, quando exigido por lei, às autoridades competentes.',
       '8. MEDIDAS DISCIPLINARES',
       'Estou ciente de que, em caso de:',
       'Mau comportamento;',
-      'Desobediencia as regras;',
+      'Desobediência às regras;',
       'Condutas que coloquem em risco outros participantes;',
-      'o(a) ACAMPANTE podera ser desligado(a) do evento, devendo o responsavel providenciar sua retirada imediata, sem direito a devolucao do valor da inscricao.',
-      '9. DECLARACAO FINAL',
+      'o(a) ACAMPANTE poderá ser desligado(a) do evento, devendo o responsável providenciar sua retirada imediata, sem direito à devolução do valor da inscrição.',
+      '9. DECLARAÇÃO FINAL',
       'Declaro que:',
       'Li integralmente este Termo;',
-      'Compreendi todas as clausulas;',
+      'Compreendi todas as cláusulas;',
       'Estou de acordo com as normas estabelecidas;',
-      'Autorizo a participacao do(a) ACAMPANTE conforme as condicoes aqui descritas.',
-      'Por ser expressao da verdade, firmo o presente Termo.'
+      'Autorizo a participação do(a) ACAMPANTE conforme as condições aqui descritas.',
+      'Por ser expressão da verdade, firmo o presente Termo.'
     ];
 
     let paginaAtual = page1;
@@ -625,7 +626,7 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     if (!selector) {
       return res.status(400).json({
         success: false,
-        message: 'inscrito_id ou order_code ou telefone_responsavel e obrigatorio para atualizar assinatura'
+        message: 'inscrito_id ou order_code ou telefone_responsavel é obrigatório para atualizar assinatura'
       });
     }
 
@@ -669,7 +670,7 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     // Construir caminho físico correto
     const caminhoFisico = path.join(__dirname, 'public', inscrito.pdf_path.replace('/assinados/', 'assinados/'));
     
-    console.log(`x Caminho físico do PDF: ${caminhoFisico}`);
+    console.log(`Caminho físico do PDF: ${caminhoFisico}`);
     
     // Ler PDF existente
     const pdfBytes = await fs.readFile(caminhoFisico);
@@ -865,7 +866,7 @@ app.get('/api/validados', async (req, res) => {
         new Date(inscrito.data_de_nascimento).toLocaleDateString('pt-BR') : 'N/A'
     }));
     
-    console.log(`🆕ncontrados ${validados.length} termos validados de ${total} total`);
+    console.log(`Encontrados ${validados.length} termos validados de ${total} no total`);
     
     res.json({
       success: true,
@@ -960,8 +961,8 @@ app.get('/api/health', (req, res) => {
 app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 Servidor rodando na porta ${port}`);
   console.log(`📁 Servindo arquivos estáticos de: ${path.join(__dirname, 'public', 'assinados')}`);
-  console.log(`🔗 Health check: http://localhost:${port}/api/health`);
-  console.log(`📋 Endpoint validados: http://localhost:${port}/api/validados`);
+  console.log(`🔗 Health check: ${host}/api/health`);
+  console.log(`📋 Endpoint validados: ${host}/api/validados`);
 });
 
 module.exports = app;
