@@ -10,6 +10,19 @@ const API_BASE_URL = process.env.REACT_APP_API_URL
     : '')
   || 'http://localhost:3001';
 
+// Helpers de CPF
+const apenasDigitosCpf = (valor) => String(valor || '').replace(/\D/g, '').slice(0, 11);
+
+const cpfEhValido = (valor) => apenasDigitosCpf(valor).length === 11;
+
+const formatarCpfExibicao = (valor) => {
+  const d = apenasDigitosCpf(valor);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+};
+
 function App() {
   const [busca, setBusca] = useState('');
   const [inscrito, setInscrito] = useState(null);
@@ -21,7 +34,8 @@ function App() {
   // Estados para contato de emergência (obrigatório)
   const [contatoEmergencia, setContatoEmergencia] = useState({
     nome: '',
-    telefone: ''
+    telefone: '',
+    documento: ''
   });
   
   // Estados para edição simplificada (opcional)
@@ -91,7 +105,8 @@ function App() {
 
     setContatoEmergencia({
       nome: inscritoData.contato_nome || '',
-      telefone: inscritoData.contato_telefone || ''
+      telefone: inscritoData.contato_telefone || '',
+      documento: inscritoData.documento || ''
     });
 
     if (forcarJaAssinado || inscritoEstaAssinado(inscritoData)) {
@@ -197,6 +212,12 @@ function App() {
       return;
     }
 
+    // Validar CPF (obrigatório para gravar na coluna documento)
+    if (!cpfEhValido(contatoEmergencia.documento)) {
+      setError('CPF é obrigatório e deve conter 11 dígitos');
+      return;
+    }
+
     setGerandoTermo(true);
     setError('');
     setSuccess('');
@@ -222,6 +243,7 @@ function App() {
           telefone_responsavel: inscrito.telefone_responsavel,
           contato_nome: contatoEmergencia.nome,
           contato_telefone: contatoEmergencia.telefone,
+          documento: contatoEmergencia.documento,
           dados_editados: modoEdicao ? dadosEditados : null
         }),
       });
@@ -236,6 +258,7 @@ function App() {
           pdf_url: data.pdf_url,
           contato_nome: contatoEmergencia.nome,
           contato_telefone: contatoEmergencia.telefone,
+          documento: data.documento || formatarCpfExibicao(contatoEmergencia.documento),
           assinatura_realizada: false
         };
 
@@ -384,7 +407,7 @@ function App() {
       <div className="container">
         <header className="header">
           <h1>Sistema de Termo de Responsabilidade</h1>
-          <p>ACAMP RELEVANTEEN 2026</p>
+          <p>ACAMP RELEVANTE JUNIORS 2026</p>
           
         </header>
 
@@ -559,6 +582,23 @@ function App() {
                   required
                 />
               </div>
+
+              <div className="form-group">
+                <label>CPF do Responsável: *</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formatarCpfExibicao(contatoEmergencia.documento)}
+                  onChange={(e) => setContatoEmergencia(prev => ({ ...prev, documento: apenasDigitosCpf(e.target.value) }))}
+                  placeholder="Ex: 000.000.000-00"
+                  className="form-input required"
+                  maxLength={14}
+                  required
+                />
+                {contatoEmergencia.documento && !cpfEhValido(contatoEmergencia.documento) && (
+                  <small style={{ color: '#c0392b' }}>CPF deve conter 11 dígitos.</small>
+                )}
+              </div>
             </div>
 
             {/* Seção de edição opcional */}
@@ -639,7 +679,7 @@ function App() {
             <div className="action-buttons">
               <button 
                 onClick={gerarTermo}
-                disabled={gerandoTermo || !contatoEmergencia.nome.trim() || !contatoEmergencia.telefone.trim()}
+                disabled={gerandoTermo || !contatoEmergencia.nome.trim() || !contatoEmergencia.telefone.trim() || !cpfEhValido(contatoEmergencia.documento)}
                 className="generate-button"
               >
                 {gerandoTermo ? 'Gerando Termo...' : '📄 Gerar Termo de Responsabilidade'}

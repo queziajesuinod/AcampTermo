@@ -112,6 +112,14 @@ function desenharTextoJustificado(
   return yAtual;
 }
 
+// Formata/valida CPF: retorna '000.000.000-00' ou null se nao tiver 11 digitos
+function formatarCpf(valor) {
+  if (valor === undefined || valor === null) return null;
+  const digitos = String(valor).replace(/\D/g, '');
+  if (digitos.length !== 11) return null;
+  return digitos.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
 // Funcao para processar campos dinamicos
 function processarCampos(texto, dados) {
   let textoProcessado = texto;
@@ -368,8 +376,17 @@ app.put('/api/inscrito/:order_code', async (req, res) => {
 // Endpoint para gerar PDF
 app.post('/api/gerar-pdf', async (req, res) => {
   try {
-    const { inscrito_id, order_code, telefone_responsavel, contato_nome, contato_telefone, dados_editados } = req.body;
+    const { inscrito_id, order_code, telefone_responsavel, contato_nome, contato_telefone, documento, dados_editados } = req.body;
     const selector = resolveInscritoSelector({ inscrito_id, order_code, telefone_responsavel });
+
+    // CPF obrigatorio para gravar na coluna documento
+    const documentoFormatado = formatarCpf(documento);
+    if (!documentoFormatado) {
+      return res.status(400).json({
+        success: false,
+        message: 'CPF é obrigatório e deve conter 11 dígitos para gerar o termo'
+      });
+    }
 
     if (!selector) {
       return res.status(400).json({
@@ -409,9 +426,12 @@ app.post('/api/gerar-pdf', async (req, res) => {
       inscrito = { ...inscrito, ...dados_editados };
     }
 
+    // Garante que o CPF informado seja usado no termo
+    inscrito.documento = documentoFormatado;
+
     await pool.query(
-      'UPDATE inscritos SET contato_nome = $1, contato_telefone = $2 WHERE id = $3',
-      [contato_nome, contato_telefone, inscritoId]
+      'UPDATE inscritos SET contato_nome = $1, contato_telefone = $2, documento = $3 WHERE id = $4',
+      [contato_nome, contato_telefone, documentoFormatado, inscritoId]
     );
 
     if (dados_editados) {
@@ -471,7 +491,7 @@ app.post('/api/gerar-pdf', async (req, res) => {
 
     yPosition -= (titleLines.length * titleLineHeight) + 12;
 
-    const subtitulo = 'ACAMP RELEVANTEEN 2026';
+    const subtitulo = 'ACAMP RELEVANTE JUNIORS 2026';
     const subtituloWidth = font.widthOfTextAtSize(subtitulo, subtitleFontSize);
     page1.drawText(subtitulo, {
       x: (pageWidth - subtituloWidth) / 2,
@@ -483,7 +503,7 @@ app.post('/api/gerar-pdf', async (req, res) => {
 
     yPosition -= 50;
 
-    const paragrafos = [
+    const paragrafos_teen = [
       'Eu, {NOME_RESPONSAVEL}, CPF n\u00BA {DOCUMENTO}, respons\u00E1vel legal pelo(a) pr\u00E9-adolescente {NOME_FILHO}, doravante denominado(a) ACAMPANTE, declaro para os devidos fins que:',
       '1. AUTORIZA\u00C7\u00C3O DE PARTICIPA\u00C7\u00C3O',
       'Autorizo o(a) ACAMPANTE a participar de todas as atividades, ministra\u00E7\u00F5es, programa\u00E7\u00F5es recreativas, esportivas, espirituais e demais din\u00E2micas realizadas no ACAMP RELEVANTEEN 2026, promovido pela Igreja Evang\u00E9lica Comunidade Global.',
@@ -521,6 +541,53 @@ app.post('/api/gerar-pdf', async (req, res) => {
       'Desobediência às regras;',
       'Condutas que coloquem em risco outros participantes;',
       'o(a) ACAMPANTE poderá ser desligado(a) do evento, devendo o responsável providenciar sua retirada imediata, sem direito à devolução do valor da inscrição.',
+      '9. DECLARAÇÃO FINAL',
+      'Declaro que:',
+      'Li integralmente este Termo;',
+      'Compreendi todas as cláusulas;',
+      'Estou de acordo com as normas estabelecidas;',
+      'Autorizo a participação do(a) ACAMPANTE conforme as condições aqui descritas.',
+      'Por ser expressão da verdade, firmo o presente Termo.'
+    ];
+
+    const paragrafos = [
+      'Eu, {NOME_RESPONSAVEL}, CPF nº {DOCUMENTO}, responsável legal pelo(a) adolescente {NOME_FILHO}, doravante denominado(a) ACAMPANTE, declaro para os devidos fins que:',
+      '1. AUTORIZAÇÃO DE PARTICIPAÇÃO',
+      'Autorizo o(a) ACAMPANTE a participar de todas as atividades, ministrações, programações recreativas, esportivas, espirituais e demais dinâmicas realizadas no ACAMP RELEVANTE JUNIORS 2026, promovido pela Igreja Evangélica Comunidade Global.',
+      'Declaro estar ciente de que o evento possui programação organizada, normas internas e acompanhamento por equipe de líderes, voluntários e coordenação.',
+      '2. AUTORIZAÇÃO PARA ATENDIMENTO MÉDICO',
+      'Autorizo, em caso de acidente, mal-estar ou necessidade médica, que a coordenação do evento encaminhe o(a) ACAMPANTE para atendimento em hospital, pronto socorro ou unidade de saúde de Campo Grande/MS, podendo inclusive autorizar medicações e/ou procedimentos emergenciais necessários à preservação da vida e da saúde.',
+      'Comprometo-me a fornecer todas as informações médicas relevantes (alergias, uso de medicamentos, restrições alimentares, condições pré-existentes).',
+      '3. AUTORIZAÇÃO DE USO DE IMAGEM',
+      'Autorizo, de forma gratuita e por prazo indeterminado, o uso da imagem do(a) ACAMPANTE registrada em fotografias ou vídeos produzidos no contexto do evento, exclusivamente para divulgação institucional, sem finalidade comercial, nas redes sociais, site oficial e demais meios de comunicação da Igreja Evangélica Comunidade Global e do ACAMP RELEVANTE JUNIORS.',
+      '4. RESPONSABILIDADE POR OBJETOS PESSOAIS',
+      'Declaro estar ciente de que a organização não se responsabiliza por extravio, perda ou dano de objetos pessoais de valor (celulares, câmeras, relógios, joias, entre outros), sendo de inteira responsabilidade do(a) ACAMPANTE e de seus responsáveis.',
+      '5. RESPONSABILIDADE POR DANOS AO PATRIMÔNIO',
+      'Comprometo-me a ressarcir integralmente eventuais danos materiais causados pelo(a) ACAMPANTE ao patrimônio do local do evento (CTOC) ou a terceiros, desde que comprovada sua responsabilidade.',
+      '6. CIÊNCIA DAS NORMAS DE CONDUTA E SEGURANÇA',
+      'Declaro estar ciente de que o ACAMP RELEVANTE JUNIORS adota Política de Segurança Infantil e Código de Estilo de Vida em Comunidade, com base na legislação brasileira, especialmente no Estatuto da Criança e do Adolescente.',
+      'Estou ciente de que:',
+      'Não são permitidos comportamentos violentos, ofensivos, discriminatórios ou desrespeitosos.',
+      'É proibido porte ou uso de drogas ilícitas, álcool, tabaco (inclusive cigarro eletrônico), armas ou objetos perigosos.',
+      'São proibidas práticas de bullying, intimidação, ameaças ou qualquer forma de abuso.',
+      'O uso de linguagem ofensiva, preconceituosa ou vulgar não será tolerado.',
+      'O acesso aos dormitórios será restrito conforme divisão por sexo.',
+      'O cumprimento de horários, regras de vestuário e participação na programação é obrigatório.',
+      'É obrigatório o uso de identificação do evento.',
+      'É vedada qualquer conduta que coloque em risco a integridade física, emocional, psicológica ou espiritual dos participantes.',
+      '7. POLÍTICA DE PROTEÇÃO E SEGURANÇA DO MENOR',
+      'A organização compromete-se a:',
+      'Garantir ambiente seguro e supervisionado;',
+      'Proteger os adolescentes contra qualquer forma de dano a sua integridade física/emocional;',
+      'Adotar medidas imediatas em caso de suspeita ou ocorrência de violação de direitos;',
+      'Comunicar responsáveis e autoridades competentes quando necessário;',
+      'Da mesma forma, declaro estar ciente de que qualquer situação grave revelada pelo(a) ACAMPANTE poderá ser encaminhada a Supervisão Pastoral e, quando exigido por lei, as autoridades competentes.',
+      '8. MEDIDAS DISCIPLINARES',
+      'Estou ciente de que, em caso de:',
+      'Mau comportamento;',
+      'Desobediência as regras;',
+      'Condutas que coloquem em risco outros participantes;',
+      'o(a) ACAMPANTE poderá ser desligado(a) do evento, devendo o responsável providenciar sua retirada imediata, sem direito a devolução do valor da inscrição.',
       '9. DECLARAÇÃO FINAL',
       'Declaro que:',
       'Li integralmente este Termo;',
@@ -605,6 +672,7 @@ app.post('/api/gerar-pdf', async (req, res) => {
     return res.json({
       success: true,
       pdf_url: pdfPath,
+      documento: documentoFormatado,
       message: 'PDF gerado com sucesso'
     });
   } catch (error) {
@@ -643,14 +711,14 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
 
     // Buscar dados do inscrito
     const result = await pool.query(`SELECT * FROM inscritos WHERE ${keyField} = $1`, [keyValue]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'Inscrito não encontrado'
       });
     }
-    
+
     if (result.rows.length > 1 && keyField !== 'id') {
       return res.status(400).json({
         success: false,
@@ -659,49 +727,49 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     }
 
     const inscrito = result.rows[0];
-    
+
     if (!inscrito.pdf_path) {
       return res.status(400).json({
         success: false,
         message: 'PDF não encontrado. Gere o termo primeiro.'
       });
     }
-    
+
     // Construir caminho físico correto
     const caminhoFisico = path.join(__dirname, 'public', inscrito.pdf_path.replace('/assinados/', 'assinados/'));
-    
+
     console.log(`Caminho físico do PDF: ${caminhoFisico}`);
-    
+
     // Ler PDF existente
     const pdfBytes = await fs.readFile(caminhoFisico);
     const pdfDoc = await PDFDocument.load(pdfBytes);
-    
+
     // Obter última página
     const pages = pdfDoc.getPages();
     const lastPage = pages[pages.length - 1];
     const { height } = lastPage.getSize();
-    
+
     // Converter assinatura base64 para PNG
     const assinaturaBase64 = assinatura.replace(/^data:image\/png;base64,/, '');
     const assinaturaBuffer = Buffer.from(assinaturaBase64, 'base64');
     const pngImage = await pdfDoc.embedPng(assinaturaBuffer);
-    
+
     // Dados para a assinatura
     const dados = {
       nomeResponsavel: inscrito.nome_responsavel || 'NÃO INFORMADO',
       documento: inscrito.documento || 'NÃO INFORMADO',
       data: dayjs().format('DD/MM/YYYY')
     };
-    
-     // 🔧 CALCULAR POSIÇÃO DINÂMICA DA ASSINATURA
+
+    // 🔧 CALCULAR POSIÇÃO DINÂMICA DA ASSINATURA
     // Buscar posição aproximada do último texto na página
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    
+
     // x POSI!ÒO MAIS PRXIMA DO aLTIMO TEXTO
     // Estimar posição baseada no conteúdo típico do documento
     let yAssinatura;
-    
+
     if (pages.length === 1) {
       // Se é uma página só, assinatura mais embaixo
       yAssinatura = 130;
@@ -709,12 +777,12 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
       // Se são duas páginas, assinatura logo após o último parágrafo da página 2
       yAssinatura = 180;
     }
-    
+
     console.log(`📍 Posição da assinatura calculada: ${yAssinatura} (altura da página: ${height})`);
-    
+
     // x ESPA!O ANTES DA ASSINATURA (MENOR)
     // Mantém a assinatura mais baixa para não conflitar com o texto final.
-    
+
     // Adicionar assinatura digital
     lastPage.drawImage(pngImage, {
       x: 50,
@@ -722,7 +790,7 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
       width: 300,
       height: 60,
     });
-    
+
     // Adicionar texto da assinatura
     lastPage.drawText(`Assinatura do responsável: ${dados.nomeResponsavel}`, {
       x: 50,
@@ -740,7 +808,7 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     });
 
     const dataLocal = `Campo Grande/MS, ${dados.data}`;
- 
+
     lastPage.drawText(dataLocal, {
       x: 50,
       y: yAssinatura - 60,
@@ -753,21 +821,21 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
     // Salvar PDF atualizado
     const pdfBytesAtualizados = await pdfDoc.save();
     await fs.writeFile(caminhoFisico, pdfBytesAtualizados);
-    
+
     // Atualizar status no banco
     await pool.query(
       'UPDATE inscritos SET assinatura_realizada = true WHERE id = $1',
       [inscrito.id]
     );
-    
+
     console.log(`✅ Assinatura adicionada com sucesso para ${keyField}: ${keyValue}`);
-    
+
     res.json({
       success: true,
       message: 'Assinatura adicionada com sucesso',
       pdf_url: inscrito.pdf_path
     });
-    
+
   } catch (error) {
     console.error('❌ Erro ao atualizar assinatura:', error);
     res.status(500).json({
@@ -782,9 +850,9 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
 app.get('/api/validados', async (req, res) => {
   try {
     console.log('🔍 Buscando termos validados...');
-    
+
     const { busca, page = 1, limit = 50 } = req.query;
-    
+
     let query = `
       SELECT 
         id,
@@ -804,34 +872,34 @@ app.get('/api/validados', async (req, res) => {
       AND pdf_path IS NOT NULL 
       AND pdf_path != ''
     `;
-    
+
     const params = [];
     let paramCount = 0;
-    
+
     // Filtro por busca (nome, order_code ou telefone_responsavel)
     if (busca && busca.trim() !== '') {
       paramCount++;
       query += ` AND (nome_completo ILIKE $${paramCount} OR order_code ILIKE $${paramCount} OR telefone_responsavel ILIKE $${paramCount})`;
       params.push(`%${busca.trim()}%`);
     }
-    
+
     // (não aplica mais filtro por campus)
-    
+
     // Ordenação
     query += ` ORDER BY id DESC`;
-    
+
     // Paginação
     const offset = (page - 1) * limit;
     paramCount++;
     query += ` LIMIT $${paramCount}`;
     params.push(limit);
-    
+
     paramCount++;
     query += ` OFFSET $${paramCount}`;
     params.push(offset);
-    
+
     const result = await pool.query(query, params);
-    
+
     // Query para contar total de registros
     let countQuery = `
       SELECT COUNT(*) as total 
@@ -840,34 +908,34 @@ app.get('/api/validados', async (req, res) => {
       AND pdf_path IS NOT NULL 
       AND pdf_path != ''
     `;
-    
+
     const countParams = [];
     let countParamCount = 0;
-    
+
     // Aplicar os mesmos filtros na contagem
     if (busca && busca.trim() !== '') {
       countParamCount++;
       countQuery += ` AND (nome_completo ILIKE $${countParamCount} OR order_code ILIKE $${countParamCount} OR telefone_responsavel ILIKE $${countParamCount})`;
       countParams.push(`%${busca.trim()}%`);
     }
-    
+
     // (não aplica mais filtro por campus)
-    
+
     const countResult = await pool.query(countQuery, countParams);
     const total = parseInt(countResult.rows[0].total);
-    
+
     // Processar resultados
     const validados = result.rows.map(inscrito => ({
       ...inscrito,
       pdf_url: inscrito.pdf_path,
       order_code: inscrito.order_code,
       telefone_responsavel: inscrito.telefone_responsavel,
-      data_nascimento_formatada: inscrito.data_de_nascimento ? 
+      data_nascimento_formatada: inscrito.data_de_nascimento ?
         new Date(inscrito.data_de_nascimento).toLocaleDateString('pt-BR') : 'N/A'
     }));
-    
+
     console.log(`Encontrados ${validados.length} termos validados de ${total} no total`);
-    
+
     res.json({
       success: true,
       data: validados,
@@ -881,7 +949,7 @@ app.get('/api/validados', async (req, res) => {
         busca
       }
     });
-    
+
   } catch (error) {
     console.error('❌ Erro ao buscar termos validados:', error);
     res.status(500).json({
@@ -896,7 +964,7 @@ app.get('/api/validados', async (req, res) => {
 app.get('/api/validados/stats', async (req, res) => {
   try {
     console.log('📊 Buscando estatísticas dos validados...');
-    
+
     const statsQuery = `
       SELECT 
         COUNT(*) as total_assinados
@@ -905,14 +973,14 @@ app.get('/api/validados/stats', async (req, res) => {
       AND pdf_path IS NOT NULL 
       AND pdf_path != ''
     `;
-    
+
     const result = await pool.query(statsQuery);
-    
+
     // Separar estatísticas gerais e por campus
     const totalAssinados = parseInt(result.rows[0]?.total_assinados || 0);
-    
+
     console.log('✅ Estatísticas calculadas com sucesso');
-    
+
     res.json({
       success: true,
       data: {
@@ -923,7 +991,7 @@ app.get('/api/validados/stats', async (req, res) => {
         por_campus: []
       }
     });
-    
+
   } catch (error) {
     console.error('❌ Erro ao buscar estatísticas:', error);
     res.status(500).json({
@@ -950,8 +1018,8 @@ app.get('*', (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     service: 'Termo de Responsabilidade API'
   });
