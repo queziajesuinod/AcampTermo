@@ -824,7 +824,7 @@ app.post('/api/atualizar-assinatura', async (req, res) => {
 
     // Atualizar status no banco
     await pool.query(
-      'UPDATE inscritos SET assinatura_realizada = true WHERE id = $1',
+      'UPDATE inscritos SET assinatura_realizada = true, data_validacao = NOW() WHERE id = $1',
       [inscrito.id]
     );
 
@@ -883,21 +883,21 @@ app.get('/api/validados', async (req, res) => {
       params.push(`%${busca.trim()}%`);
     }
 
-    // Filtro por data: termo entra se created_at OU updated_at cair dentro do range
+    // Filtro por data: usa a data em que o termo foi validado (assinado)
     const di = data_inicio && data_inicio.trim() !== '' ? data_inicio.trim() : null;
     const df = data_fim && data_fim.trim() !== '' ? data_fim.trim() : null;
     if (di && df) {
       const pi = ++paramCount;
       const pf = ++paramCount;
-      query += ` AND ((created_at::date BETWEEN $${pi} AND $${pf}) OR (updated_at::date BETWEEN $${pi} AND $${pf}))`;
+      query += ` AND data_validacao::date BETWEEN $${pi} AND $${pf}`;
       params.push(di, df);
     } else if (di) {
       paramCount++;
-      query += ` AND (created_at::date >= $${paramCount} OR updated_at::date >= $${paramCount})`;
+      query += ` AND data_validacao::date >= $${paramCount}`;
       params.push(di);
     } else if (df) {
       paramCount++;
-      query += ` AND (created_at::date <= $${paramCount} OR updated_at::date <= $${paramCount})`;
+      query += ` AND data_validacao::date <= $${paramCount}`;
       params.push(df);
     }
 
@@ -941,15 +941,15 @@ app.get('/api/validados', async (req, res) => {
     if (di && df) {
       const pi = ++countParamCount;
       const pf = ++countParamCount;
-      countQuery += ` AND ((created_at::date BETWEEN $${pi} AND $${pf}) OR (updated_at::date BETWEEN $${pi} AND $${pf}))`;
+      countQuery += ` AND data_validacao::date BETWEEN $${pi} AND $${pf}`;
       countParams.push(di, df);
     } else if (di) {
       countParamCount++;
-      countQuery += ` AND (created_at::date >= $${countParamCount} OR updated_at::date >= $${countParamCount})`;
+      countQuery += ` AND data_validacao::date >= $${countParamCount}`;
       countParams.push(di);
     } else if (df) {
       countParamCount++;
-      countQuery += ` AND (created_at::date <= $${countParamCount} OR updated_at::date <= $${countParamCount})`;
+      countQuery += ` AND data_validacao::date <= $${countParamCount}`;
       countParams.push(df);
     }
 
