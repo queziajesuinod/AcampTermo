@@ -63,11 +63,15 @@ function Validados() {
         setPaginacao(data.pagination);
         console.log(`✅ ${data.data.length} validados carregados`);
       } else {
+        setValidados([]);
+        setPaginacao(prev => ({ ...prev, page: 1, total: 0, totalPages: 0 }));
         setError(data.message || 'Erro ao buscar validados');
       }
-      
+
     } catch (error) {
       console.error('❌ Erro ao buscar validados:', error);
+      setValidados([]);
+      setPaginacao(prev => ({ ...prev, page: 1, total: 0, totalPages: 0 }));
       setError('Erro ao conectar com o servidor');
     } finally {
       setLoadingValidados(false);
