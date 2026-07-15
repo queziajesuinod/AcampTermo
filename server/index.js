@@ -851,7 +851,7 @@ app.get('/api/validados', async (req, res) => {
   try {
     console.log('🔍 Buscando termos validados...');
 
-    const { busca, page = 1, limit = 50 } = req.query;
+    const { busca, data_inicio, data_fim, page = 1, limit = 50 } = req.query;
 
     let query = `
       SELECT 
@@ -881,6 +881,24 @@ app.get('/api/validados', async (req, res) => {
       paramCount++;
       query += ` AND (nome_completo ILIKE $${paramCount} OR order_code ILIKE $${paramCount} OR telefone_responsavel ILIKE $${paramCount})`;
       params.push(`%${busca.trim()}%`);
+    }
+
+    // Filtro por data: termo entra se created_at OU updated_at cair dentro do range
+    const di = data_inicio && data_inicio.trim() !== '' ? data_inicio.trim() : null;
+    const df = data_fim && data_fim.trim() !== '' ? data_fim.trim() : null;
+    if (di && df) {
+      const pi = ++paramCount;
+      const pf = ++paramCount;
+      query += ` AND ((created_at::date BETWEEN $${pi} AND $${pf}) OR (updated_at::date BETWEEN $${pi} AND $${pf}))`;
+      params.push(di, df);
+    } else if (di) {
+      paramCount++;
+      query += ` AND (created_at::date >= $${paramCount} OR updated_at::date >= $${paramCount})`;
+      params.push(di);
+    } else if (df) {
+      paramCount++;
+      query += ` AND (created_at::date <= $${paramCount} OR updated_at::date <= $${paramCount})`;
+      params.push(df);
     }
 
     // (não aplica mais filtro por campus)
@@ -919,6 +937,22 @@ app.get('/api/validados', async (req, res) => {
       countParams.push(`%${busca.trim()}%`);
     }
 
+    // Aplicar o mesmo filtro de data na contagem
+    if (di && df) {
+      const pi = ++countParamCount;
+      const pf = ++countParamCount;
+      countQuery += ` AND ((created_at::date BETWEEN $${pi} AND $${pf}) OR (updated_at::date BETWEEN $${pi} AND $${pf}))`;
+      countParams.push(di, df);
+    } else if (di) {
+      countParamCount++;
+      countQuery += ` AND (created_at::date >= $${countParamCount} OR updated_at::date >= $${countParamCount})`;
+      countParams.push(di);
+    } else if (df) {
+      countParamCount++;
+      countQuery += ` AND (created_at::date <= $${countParamCount} OR updated_at::date <= $${countParamCount})`;
+      countParams.push(df);
+    }
+
     // (não aplica mais filtro por campus)
 
     const countResult = await pool.query(countQuery, countParams);
@@ -946,7 +980,9 @@ app.get('/api/validados', async (req, res) => {
         totalPages: Math.ceil(total / limit)
       },
       filters: {
-        busca
+        busca,
+        data_inicio: di,
+        data_fim: df
       }
     });
 

@@ -257,7 +257,29 @@ function Validados() {
               className="filtro-input"
             />
           </div>
-          
+
+          <div className="filtro-group">
+            <label htmlFor="data_inicio">📅 Data Inicial:</label>
+            <input
+              id="data_inicio"
+              type="date"
+              value={filtros.data_inicio}
+              onChange={(e) => setFiltros(prev => ({ ...prev, data_inicio: e.target.value }))}
+              className="filtro-input"
+            />
+          </div>
+
+          <div className="filtro-group">
+            <label htmlFor="data_fim">📅 Data Final:</label>
+            <input
+              id="data_fim"
+              type="date"
+              value={filtros.data_fim}
+              onChange={(e) => setFiltros(prev => ({ ...prev, data_fim: e.target.value }))}
+              className="filtro-input"
+            />
+          </div>
+
         </div>
         
         <div className="filtros-actions">
